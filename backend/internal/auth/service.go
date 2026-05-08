@@ -12,6 +12,7 @@ import (
 var (
 	ErrUserAlreadyExists  = errors.New("user already exists")
 	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrInvalidSession     = errors.New("invalid session")
 )
 
 type Service struct {
@@ -86,6 +87,23 @@ func (s *Service) Login(email, password string) (*Session, error) {
 
 func (s *Service) Logout(sessionToken string) error {
 	return s.repo.DeleteSession(sessionToken)
+}
+
+func (s *Service) GetCurrentUser(sessionToken string) (*User, error) {
+	session, err := s.ValidateSession(sessionToken)
+	if err != nil {
+		return nil, ErrInvalidSession
+	}
+
+	user, err := s.repo.GetUserByID(session.UserID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, ErrInvalidSession
+	}
+
+	return user, nil
 }
 
 func (s *Service) ValidateSession(sessionToken string) (*Session, error) {

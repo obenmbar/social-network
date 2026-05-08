@@ -36,6 +36,19 @@ func (r *Repository) GetUserByEmail(email string) (*User, error) {
 	return u, nil
 }
 
+func (r *Repository) GetUserByID(id string) (*User, error) {
+	u := &User{}
+	query := `SELECT id, email, password_hash, first_name, last_name, date_of_birth, gender, avatar, nickname, about_me, is_public, created_at FROM users WHERE id = ?`
+	err := r.db.QueryRow(query, id).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.DateOfBirth, &u.Gender, &u.Avatar, &u.Nickname, &u.AboutMe, &u.IsPublic, &u.CreatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+	return u, nil
+}
+
 func (r *Repository) CreateSession(s *Session) error {
 	query := `INSERT INTO sessions (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)`
 	_, err := r.db.Exec(query, s.ID, s.UserID, s.Token, s.ExpiresAt)

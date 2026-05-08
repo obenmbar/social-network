@@ -15,23 +15,36 @@ func NewHandler(service *Service) *Handler {
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		writeJSONError(w, "Invalid request body", http.StatusBadRequest)
 		return
+	}
+
+	// Sanitize empty strings to nil to avoid DB constraint issues
+	if req.Nickname != nil && *req.Nickname == "" {
+		req.Nickname = nil
+	}
+	if req.AboutMe != nil && *req.AboutMe == "" {
+		req.AboutMe = nil
+	}
+	if req.Avatar != nil && *req.Avatar == "" {
+		req.Avatar = nil
 	}
 
 	if err := h.service.Register(req); err != nil {
 		if err == ErrUserAlreadyExists {
-			http.Error(w, err.Error(), http.StatusConflict)
+			writeJSONError(w, err.Error(), http.StatusConflict)
 			return
 		}
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -40,24 +53,26 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		writeJSONError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	session, err := h.service.Login(req.Email, req.Password)
 	if err != nil {
 		if err == ErrInvalidCredentials {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			writeJSONError(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -73,15 +88,45 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "Login successful"})
 }
 
-func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+
+	if r.Method != http.MethodGet {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	cookie, err := r.Cookie("session_token")
 	if err != nil {
-		http.Error(w, "Not logged in", http.StatusUnauthorized)
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := h.service.GetCurrentUser(cookie.Value)
+	if err != nil {
+		if err == ErrInvalidSession {
+			writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+			return
+		}
+		writeJSONError(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(user)
+}
+
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+
+	cookie, err := r.Cookie("session_token")
+	if err != nil {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
 		return
 	}
 
 	if err := h.service.Logout(cookie.Value); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -95,4 +140,13 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Logout successful"})
+}
+
+func writeJSONHeader(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+}
+
+func writeJSONError(w http.ResponseWriter, message string, status int) {
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
