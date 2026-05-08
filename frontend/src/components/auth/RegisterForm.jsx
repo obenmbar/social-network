@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { register } from "@/lib/api";
 import Notification from "@/components/ui/Notification";
@@ -212,6 +213,10 @@ export default function RegisterForm() {
           {isLoading ? "Registering..." : "Register"}
         </button>
       </form>
+
+      <p className={styles.authSwitch}>
+        Already have an account? <Link href="/login">Login</Link>
+      </p>
     </div>
   );
 }

@@ -60,6 +60,23 @@
   cursor: not-allowed;
 }
 
+.authSwitch {
+  margin: 1.25rem 0 0;
+  text-align: center;
+  color: var(--foreground);
+  font-size: 0.95rem;
+}
+
+.authSwitch a {
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.authSwitch a:hover {
+  text-decoration: underline;
+}
+
 .error {
   color: var(--error);
   background-color: #fee2e2;

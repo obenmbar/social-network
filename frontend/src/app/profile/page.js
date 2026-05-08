@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getCurrentUser } from "@/lib/api";
@@ -34,12 +33,6 @@ export default function ProfilePage() {
 
   return (
     <main className={styles.profilePage}>
-      <nav className={styles.navbar}>
-        <Link href="/" className={styles.backLink}>
-          Ophanim
-        </Link>
-      </nav>
-
       <section className={styles.profilePanel}>
         <div className={styles.avatar}>
           {user?.avatar ? (

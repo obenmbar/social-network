@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
 import Notification from "@/components/ui/Notification";
@@ -72,6 +73,10 @@ export default function LoginForm() {
           {isLoading ? "Logging in..." : "Login"}
         </button>
       </form>
+
+      <p className={styles.authSwitch}>
+        Don&apos;t have an account? <Link href="/register">Register</Link>
+      </p>
     </div>
   );
 }
