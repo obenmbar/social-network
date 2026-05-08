@@ -1,0 +1,239 @@
+.feedContainer {
+  min-height: 100vh;
+  background-color: var(--background);
+  color: var(--foreground);
+  display: flex;
+  flex-direction: column;
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.titleLink {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--foreground);
+}
+
+.navActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.iconButton,
+.avatarButton {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--background);
+  color: var(--foreground);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.iconButton:hover,
+.avatarButton:hover,
+.avatarMenu:focus-within .avatarButton {
+  background-color: var(--border);
+  border-color: var(--primary);
+}
+
+.iconButton svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.avatarMenu {
+  position: relative;
+}
+
+.avatarButton {
+  padding: 0;
+  overflow: hidden;
+  font: inherit;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background-position: center;
+  background-size: cover;
+}
+
+.avatarInitial {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.menuList {
+  min-width: 150px;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  padding: 0.35rem;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.avatarMenu:hover .menuList,
+.avatarMenu:focus-within .menuList {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.menuItem {
+  width: 100%;
+  min-height: 36px;
+  padding: 0.5rem 0.65rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground);
+  display: flex;
+  align-items: center;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover:not(:disabled),
+.menuItem:focus-visible {
+  background-color: var(--background);
+  outline: none;
+}
+
+.menuItem:disabled {
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+}
+
+.mainContent {
+  flex: 1;
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.welcomeSection {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.welcomeSection h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+}
+
+.welcomeSection p {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+
+.postsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.postPlaceholder {
+  display: flex;
+  gap: 1rem;
+  padding: 1.5rem;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.avatarPlaceholder {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--border);
+  flex-shrink: 0;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.contentPlaceholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.linePlaceholder {
+  height: 12px;
+  border-radius: 6px;
+  background-color: var(--border);
+  width: 100%;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.linePlaceholderShort {
+  height: 12px;
+  border-radius: 6px;
+  background-color: var(--border);
+  width: 60%;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (max-width: 520px) {
+  .navbar {
+    padding: 0.75rem 1rem;
+  }
+
+  .titleLink {
+    font-size: 1.25rem;
+  }
+
+  .iconButton,
+  .avatarButton {
+    width: 38px;
+    height: 38px;
+  }
+}
