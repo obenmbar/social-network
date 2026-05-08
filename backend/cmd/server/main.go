@@ -3,8 +3,10 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"social-network/internal/auth"
@@ -18,9 +20,9 @@ func main() {
 	_, srcFile, _, _ := runtime.Caller(0)
 	projectRoot := filepath.Join(filepath.Dir(srcFile), "..", "..")
 
-	dbPath := filepath.Join(projectRoot, "data", "social_network.db")
-	migrationsPath := filepath.Join(projectRoot, "migrations", "sqlite")
-	port := ":8080"
+	dbPath := getEnv("DB_PATH", filepath.Join(projectRoot, "data", "social_network.db"))
+	migrationsPath := getEnv("MIGRATIONS_PATH", filepath.Join(projectRoot, "migrations", "sqlite"))
+	port := strings.TrimPrefix(getEnv("PORT", "8080"), ":")
 
 	// 1. Initialize Database
 	db, err := sqlite.Connect(dbPath)
@@ -52,14 +54,23 @@ func main() {
 	mux.HandleFunc("/login", authHandler.Login)
 
 	// Protected routes
+	mux.Handle("/me", sessionAuth(http.HandlerFunc(authHandler.Me)))
 	mux.Handle("/logout", sessionAuth(http.HandlerFunc(authHandler.Logout)))
 
-	// Wrap entire mux with Rate Limiter
 	handler := rateLimiter.Middleware()(mux)
 
 	// 5. Start Server
-	log.Printf("Server starting on http://localhost%s", port)
-	if err := http.ListenAndServe(port, handler); err != nil {
+	addr := ":" + port
+	log.Printf("Server starting on http://localhost%s", addr)
+	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
+}
+
+func getEnv(key, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	return value
 }
