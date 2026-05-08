@@ -1,0 +1,146 @@
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.titleLink {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--foreground);
+}
+
+.navActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.iconButton,
+.avatarButton {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--background);
+  color: var(--foreground);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.iconButton:hover,
+.avatarButton:hover,
+.avatarMenu:focus-within .avatarButton {
+  background-color: var(--border);
+  border-color: var(--primary);
+}
+
+.iconButton svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.avatarMenu {
+  position: relative;
+}
+
+.avatarButton {
+  padding: 0;
+  overflow: hidden;
+  font: inherit;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background-position: center;
+  background-size: cover;
+}
+
+.avatarInitial {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.menuList {
+  min-width: 150px;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  padding: 0.35rem;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.avatarMenu:hover .menuList,
+.avatarMenu:focus-within .menuList {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.menuItem {
+  width: 100%;
+  min-height: 36px;
+  padding: 0.5rem 0.65rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground);
+  display: flex;
+  align-items: center;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover:not(:disabled),
+.menuItem:focus-visible {
+  background-color: var(--background);
+  outline: none;
+}
+
+.menuItem:disabled {
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+  .navbar {
+    padding: 0.75rem 1rem;
+  }
+
+  .titleLink {
+    font-size: 1.25rem;
+  }
+
+  .iconButton,
+  .avatarButton {
+    width: 38px;
+    height: 38px;
+  }
+}
