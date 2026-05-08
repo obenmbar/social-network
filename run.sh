@@ -22,8 +22,8 @@ echo "Backend: http://localhost:8080"
 echo "Frontend: http://localhost:3000"
 echo "Press Ctrl+C to stop both."
 
-# Trap termination signals to kill both processes gracefully
+# Trap termination signals to kill both processes gracefully.
 trap "echo -e '\nStopping services...'; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit 0" SIGINT SIGTERM EXIT
 
-# Keep script running while background processes are alive
+# Keep script running while background processes are alive.
 wait
