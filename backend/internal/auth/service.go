@@ -86,6 +86,9 @@ func (s *Service) Login(email, password string) (*Session, error) {
 }
 
 func (s *Service) Logout(sessionToken string) error {
+	if sessionToken == "" {
+		return nil
+	}
 	return s.repo.DeleteSession(sessionToken)
 }
 
@@ -107,11 +110,18 @@ func (s *Service) GetCurrentUser(sessionToken string) (*User, error) {
 }
 
 func (s *Service) ValidateSession(sessionToken string) (*Session, error) {
+	if sessionToken == "" || len(sessionToken) > MaxSessionTokenLength {
+		return nil, ErrInvalidSession
+	}
+
 	session, err := s.repo.GetSessionByToken(sessionToken)
 	if err != nil {
 		return nil, err
 	}
 	if session == nil || time.Now().After(session.ExpiresAt) {
+		if session != nil {
+			_ = s.repo.DeleteSession(sessionToken)
+		}
 		return nil, errors.New("session expired or invalid")
 	}
 	return session, nil

@@ -11,6 +11,7 @@ import (
 
 	"social-network/internal/auth"
 	"social-network/internal/middleware"
+	"social-network/internal/posts"
 	"social-network/pkg/db/sqlite"
 )
 
@@ -41,6 +42,9 @@ func main() {
 	authRepo := auth.NewRepository(db)
 	authService := auth.NewService(authRepo)
 	authHandler := auth.NewHandler(authService)
+	postsRepo := posts.NewRepository(db)
+	postsService := posts.NewService(postsRepo, filepath.Join(projectRoot, "uploads"))
+	postsHandler := posts.NewHandler(postsService)
 
 	// Middlewares
 	rateLimiter := middleware.NewRateLimiter(20, time.Minute)
@@ -56,13 +60,26 @@ func main() {
 	// Protected routes
 	mux.Handle("/me", sessionAuth(http.HandlerFunc(authHandler.Me)))
 	mux.Handle("/logout", sessionAuth(http.HandlerFunc(authHandler.Logout)))
+	mux.Handle("/posts", sessionAuth(http.HandlerFunc(postsHandler.CreatePost)))
+	mux.Handle("/posts/feed", sessionAuth(http.HandlerFunc(postsHandler.Feed)))
+	mux.Handle("/posts/{id}", sessionAuth(http.HandlerFunc(postsHandler.GetPost)))
+	mux.Handle("/posts/{id}/comments", sessionAuth(http.HandlerFunc(postsHandler.CreateComment)))
 
-	handler := rateLimiter.Middleware()(mux)
+	// Uploaded media
+	mux.Handle("/uploads/", sessionAuth(http.HandlerFunc(postsHandler.ServeUpload)))
+
+	handler := middleware.RequestHeaderSizeMiddleware(16 << 10)(rateLimiter.Middleware()(mux))
 
 	// 5. Start Server
 	addr := ":" + port
 	log.Printf("Server starting on http://localhost%s", addr)
-	if err := http.ListenAndServe(addr, handler); err != nil {
+	server := &http.Server{
+		Addr:           addr,
+		Handler:        handler,
+		ErrorLog:       log.New(os.Stderr, "http: ", log.LstdFlags),
+		MaxHeaderBytes: 16 << 10,
+	}
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }

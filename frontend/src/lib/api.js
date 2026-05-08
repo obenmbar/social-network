@@ -4,16 +4,17 @@ const API_BASE = "/api";
  * Handles backend requests with credentials to pass cookies automatically.
  */
 async function fetchAPI(endpoint, method = "GET", body = null) {
+  const isFormData = body instanceof FormData;
   const options = {
     method,
-    headers: {
+    headers: isFormData ? {} : {
       "Content-Type": "application/json",
     },
     credentials: "include", // Essential for Go session cookies
   };
 
   if (body) {
-    options.body = JSON.stringify(body);
+    options.body = isFormData ? body : JSON.stringify(body);
   }
 
   const res = await fetch(`${API_BASE}${endpoint}`, options);
@@ -54,4 +55,51 @@ export async function getCurrentUser() {
 
 export async function logout() {
   return fetchAPI("/logout", "POST");
+}
+
+export async function getFeed() {
+  return fetchAPI("/posts/feed");
+}
+
+export async function createPost({ content, privacy, allowedUserIds = [], image }) {
+  const formData = new FormData();
+  formData.append("content", content);
+  formData.append("privacy", privacy);
+
+  allowedUserIds.forEach((userId) => {
+    formData.append("allowed_user_ids", userId);
+  });
+
+  if (image) {
+    formData.append("image", image);
+  }
+
+  return fetchAPI("/posts", "POST", formData);
+}
+
+export async function getPost(postId) {
+  return fetchAPI(`/posts/${postId}`);
+}
+
+export async function createComment(postId, { content, image }) {
+  const formData = new FormData();
+  formData.append("content", content);
+
+  if (image) {
+    formData.append("image", image);
+  }
+
+  return fetchAPI(`/posts/${postId}/comments`, "POST", formData);
+}
+
+export function mediaUrl(path) {
+  if (!path) {
+    return "";
+  }
+
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+
+  return `${API_BASE}/${path.replace(/^\/+/, "")}`;
 }

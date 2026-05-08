@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
+	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -14,25 +16,39 @@ type contextKey string
 
 const UserIDKey contextKey = "userID"
 
+const maxRequestHeaderBytes = 16 << 10
+
 // SessionMiddleware intercepts requests, reads the session ID from the Cookie,
 // checks validity via the repository, and injects UserID into the context.
 func SessionMiddleware(repo *auth.Repository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie("session_token")
+			cookie, err := r.Cookie(auth.SessionCookieName)
 			if err != nil {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				writeUnauthorized(w, r, "Unauthorized")
+				return
+			}
+
+			if len(cookie.Value) == 0 || len(cookie.Value) > auth.MaxSessionTokenLength {
+				log.Printf("rejecting invalid session cookie length: remote=%s path=%s cookie_len=%d", r.RemoteAddr, r.URL.Path, len(cookie.Value))
+				writeUnauthorized(w, r, "Unauthorized")
 				return
 			}
 
 			session, err := repo.GetSessionByToken(cookie.Value)
 			if err != nil || session == nil {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				if err != nil {
+					log.Printf("failed to load session: remote=%s path=%s err=%v", r.RemoteAddr, r.URL.Path, err)
+				}
+				writeUnauthorized(w, r, "Unauthorized")
 				return
 			}
 
 			if time.Now().After(session.ExpiresAt) {
-				http.Error(w, "Session expired", http.StatusUnauthorized)
+				if err := repo.DeleteSession(cookie.Value); err != nil {
+					log.Printf("failed to delete expired session: remote=%s path=%s err=%v", r.RemoteAddr, r.URL.Path, err)
+				}
+				writeUnauthorized(w, r, "Session expired")
 				return
 			}
 
@@ -41,6 +57,47 @@ func SessionMiddleware(repo *auth.Repository) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+func RequestHeaderSizeMiddleware(limit int) func(http.Handler) http.Handler {
+	if limit <= 0 {
+		limit = maxRequestHeaderBytes
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			size := requestHeaderSize(r)
+			if size > limit {
+				log.Printf("request headers too large: remote=%s method=%s path=%s header_bytes=%d limit=%d cookie_bytes=%d", r.RemoteAddr, r.Method, r.URL.Path, size, limit, len(r.Header.Get("Cookie")))
+				auth.ClearSessionCookie(w, r)
+				writeJSONError(w, "Request headers too large", http.StatusRequestHeaderFieldsTooLarge)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func requestHeaderSize(r *http.Request) int {
+	size := len(r.Method) + len(r.URL.RequestURI()) + len(r.Proto) + 4
+	for name, values := range r.Header {
+		for _, value := range values {
+			size += len(name) + len(value) + 4
+		}
+	}
+	return size
+}
+
+func writeUnauthorized(w http.ResponseWriter, r *http.Request, message string) {
+	auth.ClearSessionCookie(w, r)
+	writeJSONError(w, message, http.StatusUnauthorized)
+}
+
+func writeJSONError(w http.ResponseWriter, message string, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
 type client struct {
