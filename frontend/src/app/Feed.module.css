@@ -2,76 +2,331 @@
   min-height: 100vh;
   background-color: var(--background);
   color: var(--foreground);
-  display: flex;
-  flex-direction: column;
 }
 
-.navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1.5rem;
+.mainContent {
+  max-width: 680px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.welcomeSection,
+.composer,
+.postCard,
+.emptyState {
   background-color: var(--surface);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
-.titleLink {
-  font-size: 1.5rem;
-  font-weight: 700;
+.welcomeSection {
+  margin-bottom: 1rem;
+  padding: 1.25rem;
+}
+
+.welcomeSection h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.35rem;
+}
+
+.welcomeSection p {
   margin: 0;
+  color: var(--muted-foreground);
+}
+
+.composer {
+  margin-bottom: 1rem;
+  padding: 1rem;
+}
+
+.composerHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.composer textarea {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  line-height: 1.45;
+}
+
+.composer textarea::placeholder,
+.commentForm input::placeholder,
+.selectedUsers input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.composerActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.segmentedControl {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--background);
+  margin-right: auto;
+}
+
+.segmentedControl button,
+.postActions button,
+.commentForm button,
+.fileButton,
+.commentFileButton,
+.primaryButton {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.segmentedControl button {
+  padding: 0 0.7rem;
+  background: transparent;
+  color: var(--muted-foreground);
+}
+
+.segmentedControl .activeSegment {
+  background-color: var(--surface);
+  color: var(--foreground);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.fileButton,
+.commentFileButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border);
+  background-color: var(--surface);
   color: var(--foreground);
 }
 
-.navActions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.fileButton input,
+.commentFileButton input {
+  display: none;
 }
 
-.iconButton,
-.avatarButton {
-  width: 42px;
-  height: 42px;
+.primaryButton,
+.commentForm button {
+  padding: 0 0.9rem;
+  background-color: var(--primary);
+  color: #ffffff;
+}
+
+.primaryButton:hover:not(:disabled),
+.commentForm button:hover {
+  background-color: var(--primary-hover);
+}
+
+.primaryButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.selectedUsers {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+}
+
+.selectedUsers input,
+.commentForm input {
+  width: 100%;
+  min-height: 38px;
   border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--background);
+  color: var(--foreground);
+  font: inherit;
+  padding: 0 0.75rem;
+}
+
+.fileName,
+.errorMessage {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.fileName {
+  color: var(--muted-foreground);
+}
+
+.errorMessage {
+  color: var(--error);
+}
+
+.postsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.postCard {
+  padding: 1rem;
+}
+
+.postHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.postHeader h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.postHeader p {
+  margin: 0.1rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+}
+
+.postContent {
+  margin: 0.9rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.postImage {
+  width: 100%;
+  max-height: 520px;
+  object-fit: cover;
+  display: block;
+  margin-top: 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--background);
+}
+
+.postActions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 0.9rem;
+}
+
+.postActions button {
+  padding: 0 0.75rem;
+  background-color: transparent;
+  color: var(--primary);
+}
+
+.postActions button:hover {
+  background-color: var(--background);
+}
+
+.comments {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.comment {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.commentBody {
+  max-width: calc(100% - 42px);
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background-color: var(--background);
+}
+
+.commentBody strong {
+  display: block;
+  font-size: 0.88rem;
+}
+
+.commentBody p {
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.commentBody img {
+  width: 100%;
+  max-width: 280px;
+  display: block;
+  margin-top: 0.45rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.commentForm {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.commentFileButton {
+  min-height: 38px;
+}
+
+.emptyState,
+.emptyComments {
+  color: var(--muted-foreground);
+}
+
+.emptyState {
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.emptyComments {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.avatar,
+.avatarSmall,
+.avatarPlaceholder {
+  flex-shrink: 0;
   border-radius: 50%;
-  background: var(--background);
+  background-color: var(--border);
   color: var(--foreground);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.iconButton:hover,
-.avatarButton:hover,
-.avatarMenu:focus-within .avatarButton {
-  background-color: var(--border);
-  border-color: var(--primary);
-}
-
-.iconButton svg {
-  width: 21px;
-  height: 21px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.avatarMenu {
-  position: relative;
-}
-
-.avatarButton {
-  padding: 0;
+  font-weight: 700;
   overflow: hidden;
-  font: inherit;
+}
+
+.avatar {
+  width: 44px;
+  height: 44px;
+}
+
+.avatarSmall {
+  width: 32px;
+  height: 32px;
+  font-size: 0.8rem;
 }
 
 .avatarImage {
@@ -82,110 +337,18 @@
   background-size: cover;
 }
 
-.avatarInitial {
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.menuList {
-  min-width: 150px;
-  position: absolute;
-  top: calc(100% + 0.5rem);
-  right: 0;
-  padding: 0.35rem;
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-4px);
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-
-.avatarMenu:hover .menuList,
-.avatarMenu:focus-within .menuList {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
-.menuItem {
-  width: 100%;
-  min-height: 36px;
-  padding: 0.5rem 0.65rem;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--foreground);
-  display: flex;
-  align-items: center;
-  font: inherit;
-  font-size: 0.9rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.menuItem:hover:not(:disabled),
-.menuItem:focus-visible {
-  background-color: var(--background);
-  outline: none;
-}
-
-.menuItem:disabled {
-  color: var(--muted-foreground);
-  cursor: not-allowed;
-}
-
-.mainContent {
-  flex: 1;
-  max-width: 600px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-
-.welcomeSection {
-  margin-bottom: 2rem;
-  padding: 1.5rem;
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
-
-.welcomeSection h2 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.5rem;
-}
-
-.welcomeSection p {
-  margin: 0;
-  color: var(--muted-foreground);
-}
-
-.postsSection {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
 .postPlaceholder {
   display: flex;
   gap: 1rem;
-  padding: 1.5rem;
+  padding: 1rem;
   background-color: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
 }
 
 .avatarPlaceholder {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background-color: var(--border);
-  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
@@ -193,47 +356,74 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding-top: 0.5rem;
+  gap: 0.7rem;
+  padding-top: 0.4rem;
 }
 
-.linePlaceholder {
-  height: 12px;
-  border-radius: 6px;
-  background-color: var(--border);
-  width: 100%;
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
+.linePlaceholder,
 .linePlaceholderShort {
   height: 12px;
   border-radius: 6px;
   background-color: var(--border);
-  width: 60%;
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+.linePlaceholder {
+  width: 100%;
+}
+
+.linePlaceholderShort {
+  width: 58%;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
 }
 
-@media (max-width: 520px) {
-  .navbar {
-    padding: 0.75rem 1rem;
+@media (max-width: 560px) {
+  .mainContent {
+    padding-inline: 0.75rem;
   }
 
-  .titleLink {
-    font-size: 1.25rem;
+  .composerActions {
+    align-items: stretch;
   }
 
-  .iconButton,
-  .avatarButton {
-    width: 38px;
-    height: 38px;
+  .segmentedControl {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .segmentedControl button {
+    flex: 1;
+    padding-inline: 0.35rem;
+  }
+
+  .fileButton,
+  .primaryButton {
+    flex: 1;
+  }
+
+  .commentForm {
+    grid-template-columns: 1fr;
   }
 }

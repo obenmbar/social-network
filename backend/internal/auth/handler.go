@@ -2,8 +2,8 @@ package auth
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
-	"time"
 )
 
 type Handler struct {
@@ -66,9 +66,16 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if cookie, err := r.Cookie(SessionCookieName); err == nil {
+		if err := h.service.Logout(cookie.Value); err != nil {
+			log.Printf("failed to remove existing session before login: %v", err)
+		}
+	}
+
 	session, err := h.service.Login(req.Email, req.Password)
 	if err != nil {
 		if err == ErrInvalidCredentials {
+			ClearSessionCookie(w, r)
 			writeJSONError(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
@@ -76,13 +83,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    session.Token,
-		Expires:  session.ExpiresAt,
-		HttpOnly: true,
-		Path:     "/",
-	})
+	SetSessionCookie(w, r, session.Token, session.ExpiresAt)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Login successful"})
@@ -96,8 +97,9 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookie, err := r.Cookie("session_token")
+	cookie, err := r.Cookie(SessionCookieName)
 	if err != nil {
+		ClearSessionCookie(w, r)
 		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
 		return
 	}
@@ -105,6 +107,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	user, err := h.service.GetCurrentUser(cookie.Value)
 	if err != nil {
 		if err == ErrInvalidSession {
+			ClearSessionCookie(w, r)
 			writeJSONError(w, "Not logged in", http.StatusUnauthorized)
 			return
 		}
@@ -119,8 +122,9 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	writeJSONHeader(w)
 
-	cookie, err := r.Cookie("session_token")
+	cookie, err := r.Cookie(SessionCookieName)
 	if err != nil {
+		ClearSessionCookie(w, r)
 		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
 		return
 	}
@@ -130,13 +134,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    "",
-		Expires:  time.Unix(0, 0),
-		HttpOnly: true,
-		Path:     "/",
-	})
+	ClearSessionCookie(w, r)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Logout successful"})

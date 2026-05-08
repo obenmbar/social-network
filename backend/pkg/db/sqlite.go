@@ -2,14 +2,16 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
+
+	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func Init(dbPath string) {*sql.DB, error} {
+func Init(dbPath string) (*sql.DB, error) {
 	dsn := dbPath + "?_foreign_keys=on&_journal_mode=WAL"
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
@@ -29,7 +31,7 @@ func Init(dbPath string) {*sql.DB, error} {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
 
-	if err = m.Up(); err!= nil && err != migrate.ErrNoCharge {
+	if err = m.Up(); err != nil && err != migrate.ErrNoChange {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
 
