@@ -97,7 +97,7 @@ export function mediaUrl(path) {
     return "";
   }
 
-  if (path.startsWith("http://") || path.startsWith("https://")) {
+  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
     return path;
   }
 

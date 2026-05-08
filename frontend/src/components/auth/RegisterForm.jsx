@@ -39,12 +39,19 @@ export default function RegisterForm() {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      const validTypes = ["image/jpg", "image/jpeg", "image/png", "image/gif", "image/webp"];
+      if (!validTypes.includes(file.type)) {
+        setNotification({ message: "Only JPG, JPEG, WEBP, and GIF images are allowed.", type: "error" });
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
       if (file.size > 2 * 1024 * 1024) { // 2MB limit
         setNotification({ message: "Image must be less than 2MB.", type: "error" });
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
-      
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData((prev) => ({
@@ -88,13 +95,13 @@ export default function RegisterForm() {
 
   return (
     <div className={styles.formContainer}>
-      <Notification 
-        message={notification.message} 
-        type={notification.type} 
-        onClose={closeNotification} 
+      <Notification
+        message={notification.message}
+        type={notification.type}
+        onClose={closeNotification}
       />
       <h2 className={styles.title}>Register</h2>
-      
+
       <form onSubmit={handleSubmit}>
         <div className={styles.formGroup}>
           <label htmlFor="email">Email *</label>
@@ -170,11 +177,11 @@ export default function RegisterForm() {
 
         <div className={styles.formGroup}>
           <label htmlFor="gender">Gender *</label>
-          <select 
-            id="gender" 
-            name="gender" 
-            value={formData.gender} 
-            onChange={handleChange} 
+          <select
+            id="gender"
+            name="gender"
+            value={formData.gender}
+            onChange={handleChange}
             required
             style={{ padding: "0.75rem", borderRadius: "4px", border: "1px solid var(--border)", fontSize: "1rem" }}
           >
@@ -202,7 +209,7 @@ export default function RegisterForm() {
             id="avatar"
             name="avatar"
             type="file"
-            accept="image/png, image/jpeg, image/gif"
+            accept=".jpg,.jpeg,.webp,.gif,image/jpeg,image/webp,image/gif"
             onChange={handleFileChange}
             ref={fileInputRef}
             style={{ padding: "0.5rem 0" }}
