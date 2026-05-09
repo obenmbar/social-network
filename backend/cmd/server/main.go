@@ -48,7 +48,7 @@ func main() {
 
 	// Middlewares
 	rateLimiter := middleware.NewRateLimiter(20, time.Minute)
-	sessionAuth := middleware.SessionMiddleware(authRepo)
+	sessionAuth := middleware.SessionMiddleware(authService)
 
 	// 4. Set up Routing (http.ServeMux)
 	mux := http.NewServeMux()
