@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -18,8 +19,8 @@ const UserIDKey contextKey = "userID"
 const maxRequestHeaderBytes = 16 << 10
 
 // SessionMiddleware intercepts requests, reads the session ID from the Cookie,
-// checks validity via the repository, and injects UserID into the context.
-func SessionMiddleware(repo *auth.Repository) func(http.Handler) http.Handler {
+// checks validity via the service, and injects UserID into the context.
+func SessionMiddleware(authService *auth.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie(auth.SessionCookieName)
@@ -28,21 +29,20 @@ func SessionMiddleware(repo *auth.Repository) func(http.Handler) http.Handler {
 				return
 			}
 
-			if !auth.IsValidSessionToken(cookie.Value) {
+			if len(cookie.Value) == 0 || len(cookie.Value) > 256 {
+				log.Printf("rejecting invalid session cookie length: remote=%s path=%s cookie_len=%d", r.RemoteAddr, r.URL.Path, len(cookie.Value))
 				writeUnauthorized(w, r, "Unauthorized")
 				return
 			}
 
-			tokenHash := auth.HashSessionToken(cookie.Value)
-			session, err := repo.GetSessionByHash(tokenHash)
-			if err != nil || session == nil {
-				writeUnauthorized(w, r, "Unauthorized")
-				return
-			}
-
-			if time.Now().After(session.ExpiresAt) {
-				_ = repo.DeleteSessionByHash(tokenHash)
-				writeUnauthorized(w, r, "Session expired")
+			session, err := authService.ValidateSession(cookie.Value)
+			if err != nil {
+				if err.Error() == "session expired or invalid" {
+					writeUnauthorized(w, r, "Session expired")
+				} else {
+					log.Printf("failed to validate session: remote=%s path=%s err=%v", r.RemoteAddr, r.URL.Path, err)
+					writeUnauthorized(w, r, "Unauthorized")
+				}
 				return
 			}
 

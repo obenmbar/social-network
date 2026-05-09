@@ -1,9 +1,7 @@
 package auth
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"regexp"
 	"strings"
@@ -87,16 +85,17 @@ func IsValidPassword(password string) bool {
 }
 
 func IsValidSessionToken(token string) bool {
-	if strings.TrimSpace(token) != token || token == "" {
+	parts := strings.Split(token, ".")
+	if len(parts) != 2 {
 		return false
 	}
-	_, err := uuid.FromString(token)
-	return err == nil
-}
-
-func HashSessionToken(token string) string {
-	sum := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(sum[:])
+	if _, err := uuid.FromString(parts[0]); err != nil {
+		return false
+	}
+	if _, err := uuid.FromString(parts[1]); err != nil {
+		return false
+	}
+	return true
 }
 
 func IsValidAvatar(avatar *string) bool {

@@ -50,7 +50,7 @@ func (r *Repository) GetUserByID(id string) (*User, error) {
 }
 
 func (r *Repository) CreateSession(s *Session) error {
-	query := `INSERT INTO sessions (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)`
+	query := `INSERT INTO sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)`
 	_, err := r.db.Exec(query, s.ID, s.UserID, s.TokenHash, s.ExpiresAt)
 	if err != nil {
 		return fmt.Errorf("failed to insert session: %w", err)
@@ -58,19 +58,19 @@ func (r *Repository) CreateSession(s *Session) error {
 	return nil
 }
 
-func (r *Repository) DeleteSessionByHash(tokenHash string) error {
-	query := `DELETE FROM sessions WHERE token = ?`
-	_, err := r.db.Exec(query, tokenHash)
+func (r *Repository) DeleteSessionByID(id string) error {
+	query := `DELETE FROM sessions WHERE id = ?`
+	_, err := r.db.Exec(query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete session: %w", err)
 	}
 	return nil
 }
 
-func (r *Repository) GetSessionByHash(tokenHash string) (*Session, error) {
+func (r *Repository) GetSessionByID(id string) (*Session, error) {
 	s := &Session{}
-	query := `SELECT id, user_id, token, expires_at, created_at FROM sessions WHERE token = ?`
-	err := r.db.QueryRow(query, tokenHash).Scan(&s.ID, &s.UserID, &s.TokenHash, &s.ExpiresAt, &s.CreatedAt)
+	query := `SELECT id, user_id, token_hash, expires_at, created_at FROM sessions WHERE id = ?`
+	err := r.db.QueryRow(query, id).Scan(&s.ID, &s.UserID, &s.TokenHash, &s.ExpiresAt, &s.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
