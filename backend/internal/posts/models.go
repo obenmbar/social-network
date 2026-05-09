@@ -11,6 +11,7 @@ const (
 type Post struct {
 	ID        string    `json:"id"`
 	UserID    string    `json:"user_id"`
+	Title     string    `json:"title"`
 	Content   string    `json:"content"`
 	Image     *string   `json:"image,omitempty"`
 	Privacy   string    `json:"privacy"`
@@ -19,6 +20,14 @@ type Post struct {
 }
 
 type Author struct {
+	ID        string  `json:"id"`
+	FirstName string  `json:"first_name"`
+	LastName  string  `json:"last_name"`
+	Nickname  *string `json:"nickname,omitempty"`
+	Avatar    *string `json:"avatar,omitempty"`
+}
+
+type Follower struct {
 	ID        string  `json:"id"`
 	FirstName string  `json:"first_name"`
 	LastName  string  `json:"last_name"`
@@ -37,6 +46,7 @@ type Comment struct {
 }
 
 type CreatePostRequest struct {
+	Title          string   `json:"title"`
 	Content        string   `json:"content"`
 	Privacy        string   `json:"privacy"`
 	AllowedUserIDs []string `json:"allowed_user_ids"`

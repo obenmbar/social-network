@@ -7,6 +7,7 @@ import {
   createPost,
   getCurrentUser,
   getFeed,
+  getFollowers,
   getPost,
   mediaUrl,
 } from "@/lib/api";
@@ -22,13 +23,17 @@ export default function Feed() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
+  const [followers, setFollowers] = useState([]);
+  const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [privacy, setPrivacy] = useState("public");
-  const [allowedUsers, setAllowedUsers] = useState("");
+  const [mentionInput, setMentionInput] = useState("@");
+  const [selectedFollowerIds, setSelectedFollowerIds] = useState([]);
   const [image, setImage] = useState(null);
   const [expandedPosts, setExpandedPosts] = useState({});
   const [commentDrafts, setCommentDrafts] = useState({});
   const [commentImages, setCommentImages] = useState({});
+  const [postingComments, setPostingComments] = useState({});
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
@@ -36,11 +41,12 @@ export default function Feed() {
   useEffect(() => {
     let isMounted = true;
 
-    Promise.all([getCurrentUser(), getFeed()])
-      .then(([currentUser, feed]) => {
+    Promise.all([getCurrentUser(), getFeed(), getFollowers()])
+      .then(([currentUser, feed, followerList]) => {
         if (isMounted) {
           setUser(currentUser);
           setPosts(feed);
+          setFollowers(followerList || []);
         }
       })
       .catch(() => {
@@ -60,11 +66,29 @@ export default function Feed() {
   }, [router]);
 
   const allowedUserIds = useMemo(() => {
-    return allowedUsers
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean);
-  }, [allowedUsers]);
+    return privacy === "private_selected" ? selectedFollowerIds : [];
+  }, [privacy, selectedFollowerIds]);
+
+  const selectedFollowers = useMemo(() => {
+    const selected = new Set(selectedFollowerIds);
+    return followers.filter((follower) => selected.has(follower.id));
+  }, [followers, selectedFollowerIds]);
+
+  const mentionQuery = mentionInput.replace(/^@/, "").trim().toLowerCase();
+  const suggestedFollowers = useMemo(() => {
+    const selected = new Set(selectedFollowerIds);
+    return followers
+      .filter((follower) => !selected.has(follower.id))
+      .filter((follower) => {
+        if (!mentionQuery) {
+          return true;
+        }
+        return (
+          displayName(follower).toLowerCase().includes(mentionQuery) ||
+          mentionHandle(follower).toLowerCase().includes(mentionQuery)
+        );
+      });
+  }, [followers, mentionQuery, selectedFollowerIds]);
 
   const handleCreatePost = async (event) => {
     event.preventDefault();
@@ -74,6 +98,7 @@ export default function Feed() {
 
     try {
       const post = await createPost({
+        title,
         content,
         privacy,
         allowedUserIds,
@@ -81,9 +106,11 @@ export default function Feed() {
       });
 
       setPosts((currentPosts) => [post, ...currentPosts]);
+      setTitle("");
       setContent("");
       setPrivacy("public");
-      setAllowedUsers("");
+      setMentionInput("@");
+      setSelectedFollowerIds([]);
       setImage(null);
       form.reset();
     } catch (err) {
@@ -91,6 +118,22 @@ export default function Feed() {
     } finally {
       setIsPosting(false);
     }
+  };
+
+  const handleMentionInputChange = (event) => {
+    const value = event.target.value;
+    setMentionInput(value.startsWith("@") ? value : `@${value}`);
+  };
+
+  const handleSelectFollower = (followerId) => {
+    setSelectedFollowerIds((current) =>
+      current.includes(followerId) ? current : [...current, followerId]
+    );
+    setMentionInput("@");
+  };
+
+  const handleRemoveFollower = (followerId) => {
+    setSelectedFollowerIds((current) => current.filter((id) => id !== followerId));
   };
 
   const handleToggleComments = async (postId) => {
@@ -120,6 +163,7 @@ export default function Feed() {
     event.preventDefault();
     const form = event.currentTarget;
     setError("");
+    setPostingComments((current) => ({ ...current, [postId]: true }));
 
     try {
       const comment = await createComment(postId, {
@@ -136,6 +180,8 @@ export default function Feed() {
       form.reset();
     } catch (err) {
       setError(err.message || "Could not add comment");
+    } finally {
+      setPostingComments((current) => ({ ...current, [postId]: false }));
     }
   };
 
@@ -152,28 +198,80 @@ export default function Feed() {
         <form className={styles.composer} onSubmit={handleCreatePost}>
           <div className={styles.composerHeader}>
             <Avatar user={user} />
-            <label className={styles.srOnly} htmlFor="post-content">
-              Post content
-            </label>
-            <textarea
-              id="post-content"
-              value={content}
-              onChange={(event) => setContent(event.target.value)}
-              placeholder="What would you like to share?"
-              rows={3}
-            />
+            <div className={styles.composerFields}>
+              <label className={styles.srOnly} htmlFor="post-title">
+                Post title
+              </label>
+              <input
+                id="post-title"
+                type="text"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Post title"
+                maxLength={120}
+              />
+              <label className={styles.srOnly} htmlFor="post-content">
+                Post content
+              </label>
+              <textarea
+                id="post-content"
+                value={content}
+                onChange={(event) => setContent(event.target.value)}
+                placeholder="What would you like to share?"
+                rows={3}
+              />
+            </div>
           </div>
 
           {privacy === "private_selected" && (
-            <label className={styles.selectedUsers}>
-              Selected follower IDs
-              <input
-                type="text"
-                value={allowedUsers}
-                onChange={(event) => setAllowedUsers(event.target.value)}
-                placeholder="user-id-1, user-id-2"
-              />
-            </label>
+            <div className={styles.mentionPicker}>
+              <label htmlFor="selected-followers">Tag followers</label>
+              <div className={styles.mentionInputWrap}>
+                {selectedFollowers.map((follower) => (
+                  <button
+                    key={follower.id}
+                    type="button"
+                    className={styles.mentionChip}
+                    onClick={() => handleRemoveFollower(follower.id)}
+                    aria-label={`Remove ${displayName(follower)}`}
+                  >
+                    @{mentionHandle(follower)}
+                  </button>
+                ))}
+                <input
+                  id="selected-followers"
+                  type="text"
+                  value={mentionInput}
+                  onChange={handleMentionInputChange}
+                  placeholder="@username"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className={styles.followerList}>
+                {suggestedFollowers.length === 0 ? (
+                  <p>
+                    {followers.length === 0
+                      ? "No followers yet."
+                      : "No matching followers."}
+                  </p>
+                ) : (
+                  suggestedFollowers.map((follower) => (
+                    <button
+                      key={follower.id}
+                      type="button"
+                      onClick={() => handleSelectFollower(follower.id)}
+                    >
+                      <Avatar user={follower} size="small" />
+                      <span>
+                        <strong>{displayName(follower)}</strong>
+                        <small>@{mentionHandle(follower)}</small>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
           )}
 
           <div className={styles.composerActions}>
@@ -194,7 +292,7 @@ export default function Feed() {
               Image
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/gif"
+                accept="image/jpeg,image/png,image/gif,image/webp"
                 onChange={(event) => setImage(event.target.files?.[0] || null)}
               />
             </label>
@@ -229,6 +327,7 @@ export default function Feed() {
                   </div>
                 </header>
 
+                {post.title && <h2 className={styles.postTitle}>{post.title}</h2>}
                 {post.content && <p className={styles.postContent}>{post.content}</p>}
                 {post.image && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -274,7 +373,7 @@ export default function Feed() {
                         Image
                         <input
                           type="file"
-                          accept="image/jpeg,image/png,image/gif"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
                           onChange={(event) =>
                             setCommentImages((current) => ({
                               ...current,
@@ -283,7 +382,14 @@ export default function Feed() {
                           }
                         />
                       </label>
-                      <button type="submit">Send</button>
+                      <button type="submit" disabled={postingComments[post.id]}>
+                        {postingComments[post.id] ? "Sending..." : "Send"}
+                      </button>
+                      {commentImages[post.id] && (
+                        <p className={styles.commentFileName}>
+                          {commentImages[post.id].name}
+                        </p>
+                      )}
                     </form>
                   </div>
                 )}
@@ -353,6 +459,20 @@ function displayName(user) {
     user.nickname ||
     "Unknown user"
   );
+}
+
+function mentionHandle(user) {
+  const nickname = user?.nickname?.trim();
+  if (nickname) {
+    return nickname.replace(/^@+/, "");
+  }
+
+  const fallback = displayName(user)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+
+  return fallback || "user";
 }
 
 function privacyLabel(privacy) {

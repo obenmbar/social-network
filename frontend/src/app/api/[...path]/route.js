@@ -15,6 +15,7 @@ const hopByHopHeaders = new Set([
 
 const SESSION_COOKIE = "session_token";
 const MAX_SESSION_TOKEN_LENGTH = 128;
+const MAX_PROXY_BODY_BYTES = 11 << 20;
 
 async function handler(request, { params }) {
   const backendUrl = process.env.BACKEND_URL || "http://localhost:8080";
@@ -36,10 +37,19 @@ async function handler(request, { params }) {
 
   const method = request.method;
   const hasBody = method !== "GET" && method !== "HEAD";
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (hasBody && contentLength > MAX_PROXY_BODY_BYTES) {
+    return NextResponse.json(
+      { error: "Request body too large" },
+      { status: 413 },
+    );
+  }
+
   const response = await fetch(targetUrl, {
     method,
     headers,
-    body: hasBody ? await request.arrayBuffer() : undefined,
+    body: hasBody ? request.body : undefined,
+    duplex: "half",
     redirect: "manual",
   });
 

@@ -35,6 +35,7 @@ func NewService(repo *Repository, uploadDir string) *Service {
 }
 
 func (s *Service) CreatePost(userID string, req CreatePostRequest, fileHeader *multipart.FileHeader) (*Post, error) {
+	req.Title = strings.TrimSpace(req.Title)
 	req.Content = strings.TrimSpace(req.Content)
 	if req.Privacy == "" {
 		req.Privacy = PrivacyPublic
@@ -42,7 +43,7 @@ func (s *Service) CreatePost(userID string, req CreatePostRequest, fileHeader *m
 	if !validPrivacy(req.Privacy) {
 		return nil, ErrInvalidPrivacy
 	}
-	if req.Content == "" && fileHeader == nil {
+	if req.Title == "" && req.Content == "" && fileHeader == nil {
 		return nil, ErrEmptyPost
 	}
 
@@ -70,6 +71,7 @@ func (s *Service) CreatePost(userID string, req CreatePostRequest, fileHeader *m
 	post := &Post{
 		ID:      id.String(),
 		UserID:  userID,
+		Title:   req.Title,
 		Content: req.Content,
 		Image:   image,
 		Privacy: req.Privacy,
@@ -84,6 +86,10 @@ func (s *Service) CreatePost(userID string, req CreatePostRequest, fileHeader *m
 
 func (s *Service) GetFeed(userID string) ([]*Post, error) {
 	return s.repo.GetVisiblePosts(userID)
+}
+
+func (s *Service) GetFollowers(userID string) ([]*Follower, error) {
+	return s.repo.GetFollowers(userID)
 }
 
 func (s *Service) GetPost(userID, postID string) (*PostDetailResponse, error) {
@@ -249,11 +255,11 @@ func validPrivacy(privacy string) bool {
 }
 
 func allowedImageExtension(ext string) bool {
-	return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif"
+	return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif" || ext == ".webp"
 }
 
 func allowedImageContentType(contentType string) bool {
-	return contentType == "image/jpeg" || contentType == "image/png" || contentType == "image/gif"
+	return contentType == "image/jpeg" || contentType == "image/png" || contentType == "image/gif" || contentType == "image/webp"
 }
 
 func uniqueStrings(values []string) []string {

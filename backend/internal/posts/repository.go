@@ -20,8 +20,8 @@ func (r *Repository) CreatePost(p *Post, allowedUserIDs []string) error {
 	}
 	defer tx.Rollback()
 
-	query := `INSERT INTO posts (id, user_id, content, image, privacy) VALUES (?, ?, ?, ?, ?)`
-	_, err = tx.Exec(query, p.ID, p.UserID, p.Content, p.Image, p.Privacy)
+	query := `INSERT INTO posts (id, user_id, title, content, image, privacy) VALUES (?, ?, ?, ?, ?, ?)`
+	_, err = tx.Exec(query, p.ID, p.UserID, p.Title, p.Content, p.Image, p.Privacy)
 	if err != nil {
 		return fmt.Errorf("failed to insert post: %w", err)
 	}
@@ -42,13 +42,13 @@ func (r *Repository) CreatePost(p *Post, allowedUserIDs []string) error {
 func (r *Repository) GetPostByID(id string) (*Post, error) {
 	p := &Post{}
 	query := `
-		SELECT p.id, p.user_id, p.content, p.image, p.privacy, p.created_at,
+		SELECT p.id, p.user_id, p.title, p.content, p.image, p.privacy, p.created_at,
 		       u.id, u.first_name, u.last_name, u.nickname, u.avatar
 		FROM posts p
 		JOIN users u ON u.id = p.user_id
 		WHERE p.id = ?`
 	err := r.db.QueryRow(query, id).Scan(
-		&p.ID, &p.UserID, &p.Content, &p.Image, &p.Privacy, &p.CreatedAt,
+		&p.ID, &p.UserID, &p.Title, &p.Content, &p.Image, &p.Privacy, &p.CreatedAt,
 		&p.Author.ID, &p.Author.FirstName, &p.Author.LastName, &p.Author.Nickname, &p.Author.Avatar,
 	)
 	if err != nil {
@@ -62,7 +62,7 @@ func (r *Repository) GetPostByID(id string) (*Post, error) {
 
 func (r *Repository) GetVisiblePosts(viewerID string) ([]*Post, error) {
 	query := `
-		SELECT p.id, p.user_id, p.content, p.image, p.privacy, p.created_at,
+		SELECT p.id, p.user_id, p.title, p.content, p.image, p.privacy, p.created_at,
 		       u.id, u.first_name, u.last_name, u.nickname, u.avatar
 		FROM posts p
 		JOIN users u ON u.id = p.user_id
@@ -95,7 +95,7 @@ func (r *Repository) GetVisiblePosts(viewerID string) ([]*Post, error) {
 	for rows.Next() {
 		p := &Post{}
 		err := rows.Scan(
-			&p.ID, &p.UserID, &p.Content, &p.Image, &p.Privacy, &p.CreatedAt,
+			&p.ID, &p.UserID, &p.Title, &p.Content, &p.Image, &p.Privacy, &p.CreatedAt,
 			&p.Author.ID, &p.Author.FirstName, &p.Author.LastName, &p.Author.Nickname, &p.Author.Avatar,
 		)
 		if err != nil {
@@ -154,6 +154,40 @@ func (r *Repository) AreFollowers(authorID string, userIDs []string) (bool, erro
 		}
 	}
 	return true, nil
+}
+
+func (r *Repository) GetFollowers(userID string) ([]*Follower, error) {
+	query := `
+		SELECT u.id, u.first_name, u.last_name, u.nickname, u.avatar
+		FROM followers f
+		JOIN users u ON u.id = f.follower_id
+		WHERE f.followed_id = ?
+		ORDER BY COALESCE(u.nickname, u.first_name || ' ' || u.last_name) COLLATE NOCASE`
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get followers: %w", err)
+	}
+	defer rows.Close()
+
+	followers := []*Follower{}
+	for rows.Next() {
+		follower := &Follower{}
+		err := rows.Scan(
+			&follower.ID,
+			&follower.FirstName,
+			&follower.LastName,
+			&follower.Nickname,
+			&follower.Avatar,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan follower: %w", err)
+		}
+		followers = append(followers, follower)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read followers: %w", err)
+	}
+	return followers, nil
 }
 
 func (r *Repository) CreateComment(c *Comment) error {

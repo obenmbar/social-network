@@ -1,4 +1,5 @@
 const API_BASE = "/api";
+const MAX_IMAGE_SIZE = 10 << 20;
 
 /**
  * Handles backend requests with credentials to pass cookies automatically.
@@ -61,8 +62,15 @@ export async function getFeed() {
   return fetchAPI("/posts/feed");
 }
 
-export async function createPost({ content, privacy, allowedUserIds = [], image }) {
+export async function getFollowers() {
+  return fetchAPI("/followers");
+}
+
+export async function createPost({ title, content, privacy, allowedUserIds = [], image }) {
+  validateImageSize(image);
+
   const formData = new FormData();
+  formData.append("title", title);
   formData.append("content", content);
   formData.append("privacy", privacy);
 
@@ -82,6 +90,8 @@ export async function getPost(postId) {
 }
 
 export async function createComment(postId, { content, image }) {
+  validateImageSize(image);
+
   const formData = new FormData();
   formData.append("content", content);
 
@@ -102,4 +112,10 @@ export function mediaUrl(path) {
   }
 
   return `${API_BASE}/${path.replace(/^\/+/, "")}`;
+}
+
+function validateImageSize(image) {
+  if (image && image.size > MAX_IMAGE_SIZE) {
+    throw new Error("Images must be 10 MB or smaller");
+  }
 }
