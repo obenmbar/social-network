@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { register } from "@/lib/api";
+import { validateAuthFields, validateAvatarFile, validateSafeText } from "@/lib/authValidation";
 import Notification from "@/components/ui/Notification";
 import styles from "./RegisterForm.module.css";
 
@@ -19,7 +20,7 @@ export default function RegisterForm() {
     gender: "",
     nickname: "",
     about_me: "",
-    avatar: "", // This will hold the Base64 string
+    avatar: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState({ message: "", type: "" });
@@ -39,15 +40,9 @@ export default function RegisterForm() {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const validTypes = ["image/jpg", "image/jpeg", "image/png", "image/gif", "image/webp"];
-      if (!validTypes.includes(file.type)) {
-        setNotification({ message: "Only JPG, JPEG, WEBP, and GIF images are allowed.", type: "error" });
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        return;
-      }
-
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
-        setNotification({ message: "Image must be less than 2MB.", type: "error" });
+      const avatarError = validateAvatarFile(file);
+      if (avatarError) {
+        setNotification({ message: avatarError, type: "error" });
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
@@ -74,15 +69,26 @@ export default function RegisterForm() {
     setIsLoading(true);
 
     try {
-      await register({
+      const trimmedData = {
         ...formData,
         email: formData.email.trim(),
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
+        date_of_birth: formData.date_of_birth.trim(),
+        gender: formData.gender.trim(),
         nickname: formData.nickname.trim() || null,
         about_me: formData.about_me.trim() || null,
         avatar: formData.avatar || null,
-      });
+      };
+      const authError = validateAuthFields(trimmedData);
+      if (authError) {
+        throw new Error(authError);
+      }
+      if (!validateSafeText(trimmedData.first_name) || !validateSafeText(trimmedData.last_name) || !validateSafeText(trimmedData.nickname || "") || !validateSafeText(trimmedData.about_me || "")) {
+        throw new Error("Text fields cannot contain HTML characters.");
+      }
+
+      await register(trimmedData);
       setNotification({ message: "Registration successful! Redirecting...", type: "success" });
       setTimeout(() => {
         router.replace("/login");
@@ -124,7 +130,8 @@ export default function RegisterForm() {
             value={formData.password}
             onChange={handleChange}
             required
-            minLength="6"
+            minLength="8"
+            maxLength="24"
           />
         </div>
 
@@ -209,7 +216,7 @@ export default function RegisterForm() {
             id="avatar"
             name="avatar"
             type="file"
-            accept=".jpg,.jpeg,.webp,.gif,image/jpeg,image/webp,image/gif"
+            accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif"
             onChange={handleFileChange}
             ref={fileInputRef}
             style={{ padding: "0.5rem 0" }}

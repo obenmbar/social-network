@@ -3,7 +3,6 @@ package middleware
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -29,25 +28,20 @@ func SessionMiddleware(repo *auth.Repository) func(http.Handler) http.Handler {
 				return
 			}
 
-			if len(cookie.Value) == 0 || len(cookie.Value) > auth.MaxSessionTokenLength {
-				log.Printf("rejecting invalid session cookie length: remote=%s path=%s cookie_len=%d", r.RemoteAddr, r.URL.Path, len(cookie.Value))
+			if !auth.IsValidSessionToken(cookie.Value) {
 				writeUnauthorized(w, r, "Unauthorized")
 				return
 			}
 
-			session, err := repo.GetSessionByToken(cookie.Value)
+			tokenHash := auth.HashSessionToken(cookie.Value)
+			session, err := repo.GetSessionByHash(tokenHash)
 			if err != nil || session == nil {
-				if err != nil {
-					log.Printf("failed to load session: remote=%s path=%s err=%v", r.RemoteAddr, r.URL.Path, err)
-				}
 				writeUnauthorized(w, r, "Unauthorized")
 				return
 			}
 
 			if time.Now().After(session.ExpiresAt) {
-				if err := repo.DeleteSession(cookie.Value); err != nil {
-					log.Printf("failed to delete expired session: remote=%s path=%s err=%v", r.RemoteAddr, r.URL.Path, err)
-				}
+				_ = repo.DeleteSessionByHash(tokenHash)
 				writeUnauthorized(w, r, "Session expired")
 				return
 			}
@@ -68,7 +62,6 @@ func RequestHeaderSizeMiddleware(limit int) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			size := requestHeaderSize(r)
 			if size > limit {
-				log.Printf("request headers too large: remote=%s method=%s path=%s header_bytes=%d limit=%d cookie_bytes=%d", r.RemoteAddr, r.Method, r.URL.Path, size, limit, len(r.Header.Get("Cookie")))
 				auth.ClearSessionCookie(w, r)
 				writeJSONError(w, "Request headers too large", http.StatusRequestHeaderFieldsTooLarge)
 				return

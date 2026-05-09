@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const SESSION_COOKIE = "session_token";
-const MAX_SESSION_TOKEN_LENGTH = 128;
+const sessionTokenPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function proxy(request) {
   const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
@@ -9,7 +9,7 @@ export function proxy(request) {
 
   const isAuthRoute = pathname === "/login" || pathname === "/register";
 
-  if (sessionToken && sessionToken.length > MAX_SESSION_TOKEN_LENGTH) {
+  if (sessionToken && !sessionTokenPattern.test(sessionToken)) {
     const response = NextResponse.redirect(new URL("/login", request.url));
     appendClearSessionCookies(response.headers);
     return response;

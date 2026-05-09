@@ -2,7 +2,6 @@ package auth
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 )
 
@@ -28,20 +27,13 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Sanitize empty strings to nil to avoid DB constraint issues
-	if req.Nickname != nil && *req.Nickname == "" {
-		req.Nickname = nil
-	}
-	if req.AboutMe != nil && *req.AboutMe == "" {
-		req.AboutMe = nil
-	}
-	if req.Avatar != nil && *req.Avatar == "" {
-		req.Avatar = nil
-	}
-
 	if err := h.service.Register(req); err != nil {
-		if err == ErrUserAlreadyExists {
+		switch err {
+		case ErrUserAlreadyExists:
 			writeJSONError(w, err.Error(), http.StatusConflict)
+			return
+		case ErrInvalidEmail, ErrInvalidPassword, ErrInvalidAvatar, ErrInvalidText:
+			writeJSONError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		writeJSONError(w, "Internal server error", http.StatusInternalServerError)
@@ -67,23 +59,26 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if cookie, err := r.Cookie(SessionCookieName); err == nil {
-		if err := h.service.Logout(cookie.Value); err != nil {
-			log.Printf("failed to remove existing session before login: %v", err)
-		}
+		_ = h.service.Logout(cookie.Value)
 	}
 
-	session, err := h.service.Login(req.Email, req.Password)
+	sessionToken, expiresAt, err := h.service.Login(req.Email, req.Password)
 	if err != nil {
-		if err == ErrInvalidCredentials {
+		switch err {
+		case ErrInvalidCredentials:
 			ClearSessionCookie(w, r)
 			writeJSONError(w, err.Error(), http.StatusUnauthorized)
+			return
+		case ErrInvalidEmail, ErrInvalidPassword:
+			ClearSessionCookie(w, r)
+			writeJSONError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	SetSessionCookie(w, r, session.Token, session.ExpiresAt)
+	SetSessionCookie(w, r, sessionToken, expiresAt)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Login successful"})
