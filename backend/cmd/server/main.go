@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"social-network/internal/auth"
+	"social-network/internal/groups"
 	"social-network/internal/middleware"
 	"social-network/internal/posts"
 	"social-network/pkg/db/sqlite"
@@ -45,6 +46,9 @@ func main() {
 	postsRepo := posts.NewRepository(db)
 	postsService := posts.NewService(postsRepo, filepath.Join(projectRoot, "uploads"))
 	postsHandler := posts.NewHandler(postsService)
+	groupsRepo := groups.NewRepository(db)
+	groupsService := groups.NewService(groupsRepo)
+	groupsHandler := groups.NewHandler(groupsService)
 
 	// Middlewares
 	rateLimiter := middleware.NewRateLimiter(20, time.Minute)
@@ -64,6 +68,18 @@ func main() {
 	mux.Handle("/posts/feed", sessionAuth(http.HandlerFunc(postsHandler.Feed)))
 	mux.Handle("/posts/{id}", sessionAuth(http.HandlerFunc(postsHandler.GetPost)))
 	mux.Handle("/posts/{id}/comments", sessionAuth(http.HandlerFunc(postsHandler.CreateComment)))
+	mux.Handle("/groups", sessionAuth(http.HandlerFunc(groupsHandler.Groups)))
+	mux.Handle("/groups/invitations", sessionAuth(http.HandlerFunc(groupsHandler.Invitations)))
+	mux.Handle("/groups/{id}", sessionAuth(http.HandlerFunc(groupsHandler.GetGroup)))
+	mux.Handle("/groups/{id}/invite", sessionAuth(http.HandlerFunc(groupsHandler.InviteUser)))
+	mux.Handle("/groups/{id}/invitations/{status}", sessionAuth(http.HandlerFunc(groupsHandler.RespondToInvitation)))
+	mux.Handle("/groups/{id}/requests", sessionAuth(http.HandlerFunc(groupsHandler.RequestToJoin)))
+	mux.Handle("/groups/{id}/requests/{userID}/{status}", sessionAuth(http.HandlerFunc(groupsHandler.RespondToJoinRequest)))
+	mux.Handle("/groups/{id}/posts", sessionAuth(http.HandlerFunc(groupsHandler.CreatePost)))
+	mux.Handle("/groups/{id}/posts/{postID}", sessionAuth(http.HandlerFunc(groupsHandler.GetPost)))
+	mux.Handle("/groups/{id}/posts/{postID}/comments", sessionAuth(http.HandlerFunc(groupsHandler.CreateComment)))
+	mux.Handle("/groups/{id}/events", sessionAuth(http.HandlerFunc(groupsHandler.CreateEvent)))
+	mux.Handle("/groups/{id}/events/{eventID}/responses", sessionAuth(http.HandlerFunc(groupsHandler.RespondToEvent)))
 
 	// Uploaded media
 	mux.Handle("/uploads/", sessionAuth(http.HandlerFunc(postsHandler.ServeUpload)))
