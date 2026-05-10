@@ -107,3 +107,219 @@ func (h *Handler) InviteUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "Invitation sent"})
 }
 
+func (h *Handler) RespondToInvitation(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodPost {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	if err := h.service.RespondToInvitation(userID, r.PathValue("id"), r.PathValue("status")); err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": "Invitation updated"})
+}
+
+func (h *Handler) RequestToJoin(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodPost {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	if err := h.service.RequestToJoin(userID, r.PathValue("id")); err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": "Request sent"})
+}
+
+func (h *Handler) RespondToJoinRequest(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodPost {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	if err := h.service.RespondToJoinRequest(userID, r.PathValue("id"), r.PathValue("userID"), r.PathValue("status")); err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": "Request updated"})
+}
+
+func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodPost {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	var req CreatePostRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	post, err := h.service.CreatePost(userID, r.PathValue("id"), req)
+	if err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(post)
+}
+
+func (h *Handler) GetPost(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodGet {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	detail, err := h.service.GetPost(userID, r.PathValue("id"), r.PathValue("postID"))
+	if err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(detail)
+}
+
+func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodPost {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	var req CreateCommentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	comment, err := h.service.CreateComment(userID, r.PathValue("id"), r.PathValue("postID"), req)
+	if err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(comment)
+}
+
+func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodPost {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	var req CreateEventRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	event, err := h.service.CreateEvent(userID, r.PathValue("id"), req)
+	if err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(event)
+}
+
+func (h *Handler) RespondToEvent(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodPost {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	var req EventResponseRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if err := h.service.RespondToEvent(userID, r.PathValue("id"), r.PathValue("eventID"), req); err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": "Event response saved"})
+}
+
+func (h *Handler) Invitations(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodGet {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	invitations, err := h.service.GetInvitations(userID)
+	if err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(invitations)
+}
+
+func userIDFromRequest(r *http.Request) (string, bool) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	return userID, ok && strings.TrimSpace(userID) != ""
+}
+
+func writeGroupError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, ErrEmptyTitle), errors.Is(err, ErrEmptyContent), errors.Is(err, ErrEmptyEvent), errors.Is(err, ErrInvalidStatus):
+		writeJSONError(w, err.Error(), http.StatusBadRequest)
+	case errors.Is(err, ErrGroupNotFound):
+		writeJSONError(w, err.Error(), http.StatusNotFound)
+	case errors.Is(err, ErrUnauthorized):
+		writeJSONError(w, err.Error(), http.StatusForbidden)
+	default:
+		writeJSONError(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func writeJSONHeader(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+}
+
+func writeJSONError(w http.ResponseWriter, message string, status int) {
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
