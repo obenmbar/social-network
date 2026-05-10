@@ -5,6 +5,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/gofrs/uuid/v5"
@@ -17,6 +18,7 @@ var (
 	ErrInvalidPassword = errors.New("password must be 8 to 24 ASCII characters")
 	ErrInvalidAvatar   = errors.New("avatar must be a PNG, JPG, JPEG, WEBP, or GIF image under 2MB")
 	ErrInvalidText     = errors.New("text fields cannot contain HTML characters")
+	ErrInvalidAge      = errors.New("age must be between 18 and 70")
 
 	emailPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._%+\-]*@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$`)
 	avatarDataURLRe = regexp.MustCompile(`^data:image/(png|jpeg|jpg|webp|gif);base64,([A-Za-z0-9+/]+={0,2})$`)
@@ -51,6 +53,9 @@ func ValidateRegisterRequest(req RegisterRequest) error {
 	}
 	if !isSafeText(req.FirstName) || !isSafeText(req.LastName) || !isSafeOptionalText(req.Nickname) || !isSafeOptionalText(req.AboutMe) {
 		return ErrInvalidText
+	}
+	if err := ValidateAge(req.DateOfBirth); err != nil {
+		return err
 	}
 	if !IsValidAvatar(req.Avatar) {
 		return ErrInvalidAvatar
@@ -126,6 +131,22 @@ func trimOptional(value **string) {
 		return
 	}
 	*value = &trimmed
+}
+
+func ValidateAge(dateOfBirth string) error {
+	dob, err := time.Parse("2006-01-02", dateOfBirth)
+	if err != nil {
+		return ErrInvalidAge
+	}
+	now := time.Now()
+	age := now.Year() - dob.Year()
+	if now.YearDay() < dob.YearDay() {
+		age--
+	}
+	if age < 18 || age > 70 {
+		return ErrInvalidAge
+	}
+	return nil
 }
 
 func isSafeText(value string) bool {

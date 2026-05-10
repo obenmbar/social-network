@@ -32,7 +32,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		case ErrUserAlreadyExists:
 			writeJSONError(w, err.Error(), http.StatusConflict)
 			return
-		case ErrInvalidEmail, ErrInvalidPassword, ErrInvalidAvatar, ErrInvalidText:
+		case ErrInvalidEmail, ErrInvalidPassword, ErrInvalidAvatar, ErrInvalidText, ErrInvalidAge:
 			writeJSONError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
