@@ -15,6 +15,7 @@ var (
 	ErrEmptyTitle    = errors.New("title is required")
 	ErrEmptyContent  = errors.New("content is required")
 	ErrEmptyEvent    = errors.New("event title and day/time are required")
+	ErrPastEvent     = errors.New("event time must be in the future")
 	ErrInvalidStatus = errors.New("invalid status")
 	ErrUserRequired  = errors.New("user is required")
 	ErrUserNotFound  = errors.New("user not found")
@@ -42,8 +43,8 @@ func (s *Service) CreateGroup(userID string, req CreateGroupRequest) (*Group, er
 		Title:       req.Title,
 		Description: req.Description,
 	}
-	inviteeIDs := uniqueStrings(req.InviteeIDs)
-	if err := s.requireExistingUsers(inviteeIDs); err != nil {
+	inviteeIDs, err := s.userIDsByNicknames(req.InviteeNicknames)
+	if err != nil {
 		return nil, err
 	}
 	if err := s.repo.CreateGroup(group, inviteeIDs); err != nil {
@@ -101,17 +102,18 @@ func (s *Service) GetGroup(userID, groupID string) (*GroupDetail, error) {
 }
 
 func (s *Service) InviteUser(userID, groupID string, req InviteRequest) error {
-	req.UserID = strings.TrimSpace(req.UserID)
-	if req.UserID == "" {
+	nickname := normalizeNickname(req.Nickname)
+	if nickname == "" {
 		return ErrUserRequired
 	}
 	if err := s.requireMember(groupID, userID); err != nil {
 		return err
 	}
-	if err := s.requireExistingUsers([]string{req.UserID}); err != nil {
+	inviteeID, err := s.userIDByNickname(nickname)
+	if err != nil {
 		return err
 	}
-	return s.repo.InviteUser(groupID, userID, req.UserID)
+	return s.repo.InviteUser(groupID, userID, inviteeID)
 }
 
 func (s *Service) RespondToInvitation(userID, groupID, status string) error {
@@ -237,6 +239,9 @@ func (s *Service) CreateEvent(userID, groupID string, req CreateEventRequest) (*
 	if err != nil {
 		return nil, ErrEmptyEvent
 	}
+	if !eventTime.After(time.Now()) {
+		return nil, ErrPastEvent
+	}
 
 	id, _ := uuid.NewV4()
 	event := &GroupEvent{ID: id.String(), GroupID: groupID, CreatorID: userID, Title: req.Title, Description: req.Description, EventTime: eventTime}
@@ -298,6 +303,30 @@ func (s *Service) requireExistingUsers(userIDs []string) error {
 	return nil
 }
 
+func (s *Service) userIDsByNicknames(nicknames []string) ([]string, error) {
+	nicknames = uniqueNicknames(nicknames)
+	userIDs := make([]string, 0, len(nicknames))
+	for _, nickname := range nicknames {
+		userID, err := s.userIDByNickname(nickname)
+		if err != nil {
+			return nil, err
+		}
+		userIDs = append(userIDs, userID)
+	}
+	return userIDs, nil
+}
+
+func (s *Service) userIDByNickname(nickname string) (string, error) {
+	userID, err := s.repo.GetUserIDByNickname(nickname)
+	if err != nil {
+		return "", err
+	}
+	if userID == "" {
+		return "", ErrUserNotFound
+	}
+	return userID, nil
+}
+
 func uniqueStrings(values []string) []string {
 	seen := make(map[string]bool)
 	unique := []string{}
@@ -310,4 +339,22 @@ func uniqueStrings(values []string) []string {
 		unique = append(unique, value)
 	}
 	return unique
+}
+
+func uniqueNicknames(values []string) []string {
+	seen := make(map[string]bool)
+	unique := []string{}
+	for _, value := range values {
+		value = normalizeNickname(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		unique = append(unique, value)
+	}
+	return unique
+}
+
+func normalizeNickname(value string) string {
+	return strings.TrimPrefix(strings.TrimSpace(value), "@")
 }

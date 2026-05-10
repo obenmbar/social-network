@@ -304,7 +304,7 @@ func userIDFromRequest(r *http.Request) (string, bool) {
 
 func writeGroupError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, ErrEmptyTitle), errors.Is(err, ErrEmptyContent), errors.Is(err, ErrEmptyEvent), errors.Is(err, ErrInvalidStatus), errors.Is(err, ErrUserRequired):
+	case errors.Is(err, ErrEmptyTitle), errors.Is(err, ErrEmptyContent), errors.Is(err, ErrEmptyEvent), errors.Is(err, ErrPastEvent), errors.Is(err, ErrInvalidStatus), errors.Is(err, ErrUserRequired):
 		writeJSONError(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, ErrGroupNotFound), errors.Is(err, ErrUserNotFound):
 		writeJSONError(w, err.Error(), http.StatusNotFound)

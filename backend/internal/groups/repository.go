@@ -98,6 +98,18 @@ func (r *Repository) UserExists(userID string) (bool, error) {
 	return exists, nil
 }
 
+func (r *Repository) GetUserIDByNickname(nickname string) (string, error) {
+	var userID string
+	err := r.db.QueryRow(`SELECT id FROM users WHERE nickname = ?`, nickname).Scan(&userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to get user by nickname: %w", err)
+	}
+	return userID, nil
+}
+
 func (r *Repository) InviteUser(groupID, inviterID, inviteeID string) error {
 	_, err := r.db.Exec(`INSERT OR IGNORE INTO group_invitations (group_id, inviter_id, invitee_id, status) VALUES (?, ?, ?, ?)`, groupID, inviterID, inviteeID, InvitationPending)
 	if err != nil {

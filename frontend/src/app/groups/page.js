@@ -125,6 +125,7 @@ export default function GroupsPage() {
   const isMember = Boolean(selectedGroup?.is_member);
   const isCreator = Boolean(detail?.requests);
   const inviteeIds = useMemo(() => parseIDs(drafts.invitees), [drafts.invitees]);
+  const minEventTime = formatDateTimeLocal(new Date());
 
   function updateDraft(key, value) {
     setDrafts((current) => ({ ...current, [key]: value }));
@@ -257,7 +258,16 @@ export default function GroupsPage() {
     event.preventDefault();
     setError("");
     try {
-      const eventTime = new Date(drafts.eventTime).toISOString();
+      const eventDate = new Date(drafts.eventTime);
+      if (!drafts.eventTime || Number.isNaN(eventDate.getTime())) {
+        setError("event title and day/time are required");
+        return;
+      }
+      if (eventDate <= new Date()) {
+        setError("event time must be in the future");
+        return;
+      }
+      const eventTime = eventDate.toISOString();
       const groupEvent = await createGroupEvent(selectedGroupId, {
         title: drafts.eventTitle,
         description: drafts.eventDescription,
@@ -468,6 +478,7 @@ export default function GroupsPage() {
                       <input
                         type="datetime-local"
                         value={drafts.eventTime}
+                        min={minEventTime}
                         onChange={(event) => updateDraft("eventTime", event.target.value)}
                       />
                       <button type="submit">Create event</button>
@@ -578,4 +589,9 @@ function formatDate(value) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatDateTimeLocal(date) {
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
