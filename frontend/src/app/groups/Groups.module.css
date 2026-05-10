@@ -1,0 +1,296 @@
+.groupsPage {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 1rem;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.sidebar,
+.sideColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.panel,
+.emptyState {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.panel h1,
+.panel h2 {
+  margin: 0 0 0.85rem;
+}
+
+.panel h1 {
+  font-size: 1.35rem;
+}
+
+.panel h2 {
+  font-size: 1rem;
+}
+
+.groupList {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.groupList button {
+  width: 100%;
+  min-height: 62px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--foreground);
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.groupList button span,
+.groupHeader span,
+.post header span,
+.event span,
+.muted {
+  color: var(--muted-foreground);
+  font-size: 0.86rem;
+}
+
+.groupList .activeGroup {
+  border-color: var(--primary);
+  background-color: var(--surface);
+}
+
+.stackForm,
+.composer,
+.comments form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.stackForm input,
+.stackForm textarea,
+.composer textarea,
+.inlineForm input,
+.comments input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--background);
+  color: var(--foreground);
+  font: inherit;
+  padding: 0.6rem 0.75rem;
+}
+
+.stackForm textarea,
+.composer textarea {
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.stackForm button,
+.composer button,
+.inlineForm button,
+.groupHeader button,
+.post button,
+.comments button,
+.requestRow button,
+.eventActions button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background-color: var(--primary);
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0 0.8rem;
+}
+
+.stackForm button:hover,
+.composer button:hover,
+.inlineForm button:hover,
+.groupHeader button:hover,
+.post button:hover,
+.comments button:hover,
+.requestRow button:hover,
+.eventActions button:hover {
+  background-color: var(--primary-hover);
+}
+
+.groupHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.groupHeader h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.45rem;
+}
+
+.groupHeader p {
+  margin: 0 0 0.4rem;
+  overflow-wrap: anywhere;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.postList,
+.eventList,
+.memberList,
+.invitationList {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.post {
+  border-top: 1px solid var(--border);
+  padding-top: 0.9rem;
+}
+
+.post:first-child {
+  border-top: 0;
+}
+
+.post header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.post p {
+  margin: 0.6rem 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.post button {
+  background-color: transparent;
+  color: var(--primary);
+}
+
+.comments {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
+.comment {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  background-color: var(--background);
+}
+
+.comment span {
+  overflow-wrap: anywhere;
+}
+
+.comments form,
+.inlineForm {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+}
+
+.event {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.event p {
+  margin: 0;
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+
+.eventActions,
+.requestRow {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.eventActions button {
+  background-color: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+
+.eventActions .selected {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.memberList span {
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  background-color: var(--background);
+}
+
+.requestRow {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.requestRow button:last-child {
+  background-color: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+
+.error {
+  margin: 0 0 1rem;
+  color: var(--error);
+}
+
+.emptyState {
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+@media (max-width: 940px) {
+  .groupsPage,
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .groupsPage {
+    padding-inline: 0.75rem;
+  }
+
+  .groupHeader,
+  .post header,
+  .requestRow {
+    flex-direction: column;
+  }
+
+  .comments form,
+  .inlineForm {
+    grid-template-columns: 1fr;
+  }
+}
