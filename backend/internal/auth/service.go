@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -24,6 +25,11 @@ func NewService(repo *Repository) *Service {
 }
 
 func (s *Service) Register(req RegisterRequest) error {
+	NormalizeRegisterRequest(&req)
+	if err := ValidateRegisterRequest(req); err != nil {
+		return err
+	}
+
 	existing, err := s.repo.GetUserByEmail(req.Email)
 	if err != nil {
 		return err
@@ -55,41 +61,60 @@ func (s *Service) Register(req RegisterRequest) error {
 	return s.repo.CreateUser(user)
 }
 
-func (s *Service) Login(email, password string) (*Session, error) {
-	user, err := s.repo.GetUserByEmail(email)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil {
-		return nil, ErrInvalidCredentials
+func (s *Service) Login(email, password string) (string, time.Time, error) {
+	req := LoginRequest{Email: email, Password: password}
+	NormalizeLoginRequest(&req)
+	if err := ValidateLoginRequest(req); err != nil {
+		return "", time.Time{}, err
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
+	user, err := s.repo.GetUserByEmail(req.Email)
 	if err != nil {
-		return nil, ErrInvalidCredentials
+		return "", time.Time{}, err
+	}
+	if user == nil {
+		return "", time.Time{}, ErrInvalidCredentials
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
+	if err != nil {
+		return "", time.Time{}, ErrInvalidCredentials
 	}
 
 	sID, _ := uuid.NewV4()
-	sToken, _ := uuid.NewV4()
+	secret, _ := uuid.NewV4()
+	secretStr := secret.String()
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(secretStr), bcrypt.DefaultCost)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to hash session secret: %w", err)
+	}
+
+	expiresAt := time.Now().Add(24 * time.Hour)
 	session := &Session{
 		ID:        sID.String(),
 		UserID:    user.ID,
-		Token:     sToken.String(),
-		ExpiresAt: time.Now().Add(24 * time.Hour),
+		TokenHash: string(hash),
+		ExpiresAt: expiresAt,
 	}
 
 	if err := s.repo.CreateSession(session); err != nil {
-		return nil, err
+		return "", time.Time{}, err
 	}
 
-	return session, nil
+	tokenValue := sID.String() + "." + secretStr
+	return tokenValue, expiresAt, nil
 }
 
 func (s *Service) Logout(sessionToken string) error {
 	if sessionToken == "" {
 		return nil
 	}
-	return s.repo.DeleteSession(sessionToken)
+	if !IsValidSessionToken(sessionToken) {
+		return ErrInvalidSession
+	}
+	parts := strings.Split(sessionToken, ".")
+	return s.repo.DeleteSessionByID(parts[0])
 }
 
 func (s *Service) GetCurrentUser(sessionToken string) (*User, error) {
@@ -110,19 +135,31 @@ func (s *Service) GetCurrentUser(sessionToken string) (*User, error) {
 }
 
 func (s *Service) ValidateSession(sessionToken string) (*Session, error) {
-	if sessionToken == "" || len(sessionToken) > MaxSessionTokenLength {
+	if !IsValidSessionToken(sessionToken) {
 		return nil, ErrInvalidSession
 	}
 
-	session, err := s.repo.GetSessionByToken(sessionToken)
+	parts := strings.Split(sessionToken, ".")
+	sID := parts[0]
+	secret := parts[1]
+
+	session, err := s.repo.GetSessionByID(sID)
 	if err != nil {
 		return nil, err
 	}
-	if session == nil || time.Now().After(session.ExpiresAt) {
-		if session != nil {
-			_ = s.repo.DeleteSession(sessionToken)
-		}
-		return nil, errors.New("session expired or invalid")
+	if session == nil {
+		return nil, ErrInvalidSession
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(session.TokenHash), []byte(secret))
+	if err != nil {
+		// Invalid secret
+		return nil, ErrInvalidSession
+	}
+
+	if time.Now().After(session.ExpiresAt) {
+		_ = s.repo.DeleteSessionByID(sID)
+		return nil, ErrInvalidSession
 	}
 	return session, nil
 }

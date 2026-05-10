@@ -54,8 +54,13 @@ func main() {
 	groupsHandler := groups.NewHandler(groupsService)
 
 	// Middlewares
+<<<<<<< HEAD
 	rateLimiter := middleware.NewRateLimiter(rateLimitRequests, rateLimitWindow)
 	sessionAuth := middleware.SessionMiddleware(authRepo)
+=======
+	rateLimiter := middleware.NewRateLimiter(20, time.Minute)
+	sessionAuth := middleware.SessionMiddleware(authService)
+>>>>>>> mohnouri
 
 	// 4. Set up Routing (http.ServeMux)
 	mux := http.NewServeMux()

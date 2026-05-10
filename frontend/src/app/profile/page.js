@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getCurrentUser } from "@/lib/api";
+import { getCurrentUser, mediaUrl } from "@/lib/api";
 import styles from "./Profile.module.css";
 
 export default function ProfilePage() {
@@ -38,7 +38,7 @@ export default function ProfilePage() {
           {user?.avatar ? (
             <span
               className={styles.avatarImage}
-              style={{ backgroundImage: `url(${user.avatar})` }}
+              style={{ backgroundImage: `url(${mediaUrl(user.avatar)})` }}
             />
           ) : (
             <span className={styles.avatarInitial}>{avatarInitial}</span>

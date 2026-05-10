@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
+import { validateAuthFields } from "@/lib/authValidation";
 import Notification from "@/components/ui/Notification";
 import styles from "./LoginForm.module.css";
 
@@ -24,7 +25,16 @@ export default function LoginForm() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const credentials = {
+        email: email.trim(),
+        password,
+      };
+      const authError = validateAuthFields(credentials);
+      if (authError) {
+        throw new Error(authError);
+      }
+
+      await login(credentials.email, credentials.password);
       setNotification({ message: "Login successful! Redirecting...", type: "success" });
       setTimeout(() => {
         router.replace("/");
@@ -65,6 +75,8 @@ export default function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            minLength="8"
+            maxLength="24"
             placeholder="••••••••"
           />
         </div>

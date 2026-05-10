@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { register } from "@/lib/api";
+import { validateAuthFields, validateAvatarFile, validateSafeText } from "@/lib/authValidation";
 import Notification from "@/components/ui/Notification";
 import styles from "./RegisterForm.module.css";
 
@@ -19,7 +20,7 @@ export default function RegisterForm() {
     gender: "",
     nickname: "",
     about_me: "",
-    avatar: "", // This will hold the Base64 string
+    avatar: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState({ message: "", type: "" });
@@ -39,12 +40,13 @@ export default function RegisterForm() {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
-        setNotification({ message: "Image must be less than 2MB.", type: "error" });
+      const avatarError = validateAvatarFile(file);
+      if (avatarError) {
+        setNotification({ message: avatarError, type: "error" });
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
-      
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData((prev) => ({
@@ -67,15 +69,39 @@ export default function RegisterForm() {
     setIsLoading(true);
 
     try {
-      await register({
+      const trimmedData = {
         ...formData,
         email: formData.email.trim(),
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
+        date_of_birth: formData.date_of_birth.trim(),
+        gender: formData.gender.trim(),
         nickname: formData.nickname.trim() || null,
         about_me: formData.about_me.trim() || null,
         avatar: formData.avatar || null,
-      });
+      };
+      const authError = validateAuthFields(trimmedData);
+      if (authError) {
+        throw new Error(authError);
+      }
+      if (!validateSafeText(trimmedData.first_name) || !validateSafeText(trimmedData.last_name) || !validateSafeText(trimmedData.nickname || "") || !validateSafeText(trimmedData.about_me || "")) {
+        throw new Error("Text fields cannot contain HTML characters.");
+      }
+
+      if (trimmedData.date_of_birth) {
+        const dob = new Date(trimmedData.date_of_birth);
+        const now = new Date();
+        let age = now.getFullYear() - dob.getFullYear();
+        const monthDiff = now.getMonth() - dob.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+          age--;
+        }
+        if (age < 18 || age > 70) {
+          throw new Error("Age must be between 18 and 70.");
+        }
+      }
+
+      await register(trimmedData);
       setNotification({ message: "Registration successful! Redirecting...", type: "success" });
       setTimeout(() => {
         router.replace("/login");
@@ -88,13 +114,13 @@ export default function RegisterForm() {
 
   return (
     <div className={styles.formContainer}>
-      <Notification 
-        message={notification.message} 
-        type={notification.type} 
-        onClose={closeNotification} 
+      <Notification
+        message={notification.message}
+        type={notification.type}
+        onClose={closeNotification}
       />
       <h2 className={styles.title}>Register</h2>
-      
+
       <form onSubmit={handleSubmit}>
         <div className={styles.formGroup}>
           <label htmlFor="email">Email *</label>
@@ -117,7 +143,8 @@ export default function RegisterForm() {
             value={formData.password}
             onChange={handleChange}
             required
-            minLength="6"
+            minLength="8"
+            maxLength="24"
           />
         </div>
 
@@ -170,11 +197,11 @@ export default function RegisterForm() {
 
         <div className={styles.formGroup}>
           <label htmlFor="gender">Gender *</label>
-          <select 
-            id="gender" 
-            name="gender" 
-            value={formData.gender} 
-            onChange={handleChange} 
+          <select
+            id="gender"
+            name="gender"
+            value={formData.gender}
+            onChange={handleChange}
             required
             style={{ padding: "0.75rem", borderRadius: "4px", border: "1px solid var(--border)", fontSize: "1rem" }}
           >
@@ -202,7 +229,7 @@ export default function RegisterForm() {
             id="avatar"
             name="avatar"
             type="file"
-            accept="image/png, image/jpeg, image/gif"
+            accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif"
             onChange={handleFileChange}
             ref={fileInputRef}
             style={{ padding: "0.5rem 0" }}

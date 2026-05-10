@@ -246,6 +246,8 @@ func (s *Service) CreateEvent(userID, groupID string, req CreateEventRequest) (*
 	return event, nil
 }
 
+
+
 func (s *Service) RespondToEvent(userID, groupID, eventID string, req EventResponseRequest) error {
 	switch req.Response {
 	case "going", "not_going":

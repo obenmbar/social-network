@@ -171,12 +171,16 @@ export function mediaUrl(path) {
     return "";
   }
 
+<<<<<<< HEAD
   if (
     path.startsWith("http://") ||
     path.startsWith("https://") ||
     path.startsWith("data:") ||
     path.startsWith("blob:")
   ) {
+=======
+  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
+>>>>>>> mohnouri
     return path;
   }
 

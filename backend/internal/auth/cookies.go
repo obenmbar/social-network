@@ -8,8 +8,7 @@ import (
 )
 
 const (
-	SessionCookieName     = "session_token"
-	MaxSessionTokenLength = 128
+	SessionCookieName = "session_token"
 )
 
 // SetSessionCookie stores only the compact opaque session token in the browser.
