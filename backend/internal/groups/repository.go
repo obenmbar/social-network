@@ -102,6 +102,32 @@ func (r *Repository) GetUserIDByNickname(nickname string) (string, error) {
 	return userID, nil
 }
 
+func (r *Repository) GetFollowers(userID string) ([]Author, error) {
+	rows, err := r.db.Query(`
+		SELECT u.id, u.first_name, u.last_name, u.nickname, u.avatar
+		FROM followers f
+		JOIN users u ON u.id = f.follower_id
+		WHERE f.followed_id = ? AND u.nickname IS NOT NULL AND TRIM(u.nickname) != ''
+		ORDER BY LOWER(u.nickname) ASC`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get followers: %w", err)
+	}
+	defer rows.Close()
+
+	followers := []Author{}
+	for rows.Next() {
+		var follower Author
+		if err := rows.Scan(&follower.ID, &follower.FirstName, &follower.LastName, &follower.Nickname, &follower.Avatar); err != nil {
+			return nil, fmt.Errorf("failed to scan follower: %w", err)
+		}
+		followers = append(followers, follower)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read followers: %w", err)
+	}
+	return followers, nil
+}
+
 func (r *Repository) InviteUser(groupID, inviterID, inviteeID string) error {
 	_, err := r.db.Exec(`INSERT OR IGNORE INTO group_invitations (group_id, inviter_id, invitee_id, status) VALUES (?, ?, ?, ?)`, groupID, inviterID, inviteeID, InvitationPending)
 	if err != nil {

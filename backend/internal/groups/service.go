@@ -276,6 +276,10 @@ func (s *Service) GetInvitations(userID string) ([]*Invitation, error) {
 	return s.repo.GetInvitations(userID)
 }
 
+func (s *Service) GetFollowers(userID string) ([]Author, error) {
+	return s.repo.GetFollowers(userID)
+}
+
 func (s *Service) requireMember(groupID, userID string) error {
 	group, err := s.repo.GetGroupByID(userID, groupID)
 	if err != nil {

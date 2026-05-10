@@ -64,6 +64,7 @@ func main() {
 	// Protected routes
 	mux.Handle("/me", sessionAuth(http.HandlerFunc(authHandler.Me)))
 	mux.Handle("/logout", sessionAuth(http.HandlerFunc(authHandler.Logout)))
+	mux.Handle("/followers", sessionAuth(http.HandlerFunc(groupsHandler.Followers)))
 	mux.Handle("/posts", sessionAuth(http.HandlerFunc(postsHandler.CreatePost)))
 	mux.Handle("/posts/feed", sessionAuth(http.HandlerFunc(postsHandler.Feed)))
 	mux.Handle("/posts/{id}", sessionAuth(http.HandlerFunc(postsHandler.GetPost)))

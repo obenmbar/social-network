@@ -6,6 +6,7 @@ import {
   createGroupComment,
   createGroupEvent,
   createGroupPost,
+  getFollowers,
   getGroup,
   getGroupInvitations,
   getGroups,
@@ -21,6 +22,7 @@ import styles from "./Groups.module.css";
 export default function GroupsPage() {
   const [groups, setGroups] = useState([]);
   const [invitations, setInvitations] = useState([]);
+  const [followers, setFollowers] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [detail, setDetail] = useState(null);
   const [expandedPosts, setExpandedPosts] = useState({});
@@ -37,15 +39,18 @@ export default function GroupsPage() {
   const [commentDrafts, setCommentDrafts] = useState({});
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [activeInviteField, setActiveInviteField] = useState("");
 
   const refreshGroups = useCallback(async () => {
     try {
-      const [groupList, inviteList] = await Promise.all([
+      const [groupList, inviteList, followerList] = await Promise.all([
         getGroups(),
         getGroupInvitations(),
+        getFollowers(),
       ]);
       setGroups(groupList || []);
       setInvitations(inviteList || []);
+      setFollowers(followerList || []);
       if (!selectedGroupId && groupList?.[0]) {
         setSelectedGroupId(groupList[0].id);
       }
@@ -71,13 +76,15 @@ export default function GroupsPage() {
 
     async function loadInitialGroups() {
       try {
-        const [groupList, inviteList] = await Promise.all([
+        const [groupList, inviteList, followerList] = await Promise.all([
           getGroups(),
           getGroupInvitations(),
+          getFollowers(),
         ]);
         if (!isMounted) return;
         setGroups(groupList || []);
         setInvitations(inviteList || []);
+        setFollowers(followerList || []);
         if (!selectedGroupId && groupList?.[0]) {
           setSelectedGroupId(groupList[0].id);
         }
@@ -126,9 +133,27 @@ export default function GroupsPage() {
   const isCreator = Boolean(detail?.requests);
   const inviteeNicknames = useMemo(() => parseNicknames(drafts.invitees), [drafts.invitees]);
   const minEventTime = formatDateTimeLocal(new Date());
+  const createInviteSuggestions = useMemo(
+    () => getMentionSuggestions(drafts.invitees, followers, true),
+    [drafts.invitees, followers],
+  );
+  const memberInviteSuggestions = useMemo(
+    () => getMentionSuggestions(drafts.inviteUser, followers, false),
+    [drafts.inviteUser, followers],
+  );
 
   function updateDraft(key, value) {
     setDrafts((current) => ({ ...current, [key]: value }));
+  }
+
+  function selectCreateInvite(nickname) {
+    updateDraft("invitees", replaceMentionToken(drafts.invitees, nickname, true));
+    setActiveInviteField("create");
+  }
+
+  function selectMemberInvite(nickname) {
+    updateDraft("inviteUser", `@${nickname}`);
+    setActiveInviteField("member");
   }
 
   async function handleCreateGroup(event) {
@@ -338,11 +363,21 @@ export default function GroupsPage() {
               placeholder="Description"
               rows={3}
             />
-            <input
-              value={drafts.invitees}
-              onChange={(event) => updateDraft("invitees", event.target.value)}
-              placeholder="Invite nicknames, comma separated"
-            />
+            <div className={styles.suggestField}>
+              <input
+                value={drafts.invitees}
+                onFocus={() => setActiveInviteField("create")}
+                onBlur={() => setTimeout(() => setActiveInviteField(""), 120)}
+                onChange={(event) => updateDraft("invitees", event.target.value)}
+                placeholder="Invite nicknames, comma separated"
+              />
+              {activeInviteField === "create" && createInviteSuggestions.length > 0 && (
+                <InviteSuggestions
+                  users={createInviteSuggestions}
+                  onSelect={selectCreateInvite}
+                />
+              )}
+            </div>
             <button type="submit">Create</button>
           </form>
         </section>
@@ -520,11 +555,22 @@ export default function GroupsPage() {
                       ))}
                     </div>
                     <form className={styles.inlineForm} onSubmit={handleInvite}>
-                      <input
-                        value={drafts.inviteUser}
-                        onChange={(event) => updateDraft("inviteUser", event.target.value)}
-                        placeholder="Nickname"
-                      />
+                      <div className={styles.suggestField}>
+                        <input
+                          value={drafts.inviteUser}
+                          onFocus={() => setActiveInviteField("member")}
+                          onBlur={() => setTimeout(() => setActiveInviteField(""), 120)}
+                          onChange={(event) => updateDraft("inviteUser", event.target.value)}
+                          placeholder="Nickname"
+                        />
+                        {activeInviteField === "member" &&
+                          memberInviteSuggestions.length > 0 && (
+                            <InviteSuggestions
+                              users={memberInviteSuggestions}
+                              onSelect={selectMemberInvite}
+                            />
+                          )}
+                      </div>
                       <button type="submit">Invite</button>
                     </form>
                   </section>
@@ -567,6 +613,31 @@ export default function GroupsPage() {
   );
 }
 
+function InviteSuggestions({ users, onSelect }) {
+  return (
+    <div className={styles.suggestions} role="listbox">
+      {users.map((user) => {
+        const nickname = user.nickname || "";
+        return (
+          <button
+            key={user.id}
+            type="button"
+            role="option"
+            aria-selected="false"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              onSelect(nickname);
+            }}
+          >
+            <strong>@{nickname}</strong>
+            <span>{displayName(user)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function parseNicknames(value) {
   return value
     .split(",")
@@ -576,6 +647,29 @@ function parseNicknames(value) {
 
 function normalizeNickname(value) {
   return value.trim().replace(/^@/, "");
+}
+
+function getMentionSuggestions(value, followers, allowCommaList) {
+  const mention = getActiveMention(value, allowCommaList);
+  if (!mention) return [];
+  const query = mention.slice(1).toLowerCase();
+  return followers.filter((user) => {
+    const nickname = user.nickname || "";
+    return nickname.toLowerCase().startsWith(query);
+  });
+}
+
+function getActiveMention(value, allowCommaList) {
+  const token = allowCommaList ? value.split(",").at(-1).trimStart() : value.trimStart();
+  return token.startsWith("@") ? token : "";
+}
+
+function replaceMentionToken(value, nickname, allowCommaList) {
+  const replacement = `@${nickname}`;
+  if (!allowCommaList) return replacement;
+  const parts = value.split(",");
+  parts[parts.length - 1] = ` ${replacement}`;
+  return `${parts.join(",").trimStart()}, `;
 }
 
 function displayName(user) {

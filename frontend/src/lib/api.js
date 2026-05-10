@@ -53,6 +53,10 @@ export async function getCurrentUser() {
   return fetchAPI("/me");
 }
 
+export async function getFollowers() {
+  return fetchAPI("/followers");
+}
+
 export async function logout() {
   return fetchAPI("/logout", "POST");
 }
