@@ -88,6 +88,19 @@ export default function RegisterForm() {
         throw new Error("Text fields cannot contain HTML characters.");
       }
 
+      if (trimmedData.date_of_birth) {
+        const dob = new Date(trimmedData.date_of_birth);
+        const now = new Date();
+        let age = now.getFullYear() - dob.getFullYear();
+        const monthDiff = now.getMonth() - dob.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+          age--;
+        }
+        if (age < 18 || age > 70) {
+          throw new Error("Age must be between 18 and 70.");
+        }
+      }
+
       await register(trimmedData);
       setNotification({ message: "Registration successful! Redirecting...", type: "success" });
       setTimeout(() => {
