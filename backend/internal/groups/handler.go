@@ -297,6 +297,25 @@ func (h *Handler) Invitations(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(invitations)
 }
 
+func (h *Handler) Followers(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodGet {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	followers, err := h.service.GetFollowers(userID)
+	if err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(followers)
+}
+
 func userIDFromRequest(r *http.Request) (string, bool) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	return userID, ok && strings.TrimSpace(userID) != ""
@@ -304,9 +323,9 @@ func userIDFromRequest(r *http.Request) (string, bool) {
 
 func writeGroupError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, ErrEmptyTitle), errors.Is(err, ErrEmptyContent), errors.Is(err, ErrEmptyEvent), errors.Is(err, ErrInvalidStatus):
+	case errors.Is(err, ErrEmptyTitle), errors.Is(err, ErrEmptyContent), errors.Is(err, ErrEmptyEvent), errors.Is(err, ErrPastEvent), errors.Is(err, ErrInvalidStatus), errors.Is(err, ErrUserRequired):
 		writeJSONError(w, err.Error(), http.StatusBadRequest)
-	case errors.Is(err, ErrGroupNotFound):
+	case errors.Is(err, ErrGroupNotFound), errors.Is(err, ErrUserNotFound):
 		writeJSONError(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, ErrUnauthorized):
 		writeJSONError(w, err.Error(), http.StatusForbidden)

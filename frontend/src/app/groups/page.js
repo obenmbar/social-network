@@ -6,6 +6,7 @@ import {
   createGroupComment,
   createGroupEvent,
   createGroupPost,
+  getFollowers,
   getGroup,
   getGroupInvitations,
   getGroups,
@@ -22,6 +23,7 @@ import styles from "./Groups.module.css";
 export default function GroupsPage() {
   const [groups, setGroups] = useState([]);
   const [invitations, setInvitations] = useState([]);
+  const [followers, setFollowers] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [detail, setDetail] = useState(null);
   const [expandedPosts, setExpandedPosts] = useState({});
@@ -38,15 +40,18 @@ export default function GroupsPage() {
   const [commentDrafts, setCommentDrafts] = useState({});
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [activeInviteField, setActiveInviteField] = useState("");
 
   const refreshGroups = useCallback(async () => {
     try {
-      const [groupList, inviteList] = await Promise.all([
+      const [groupList, inviteList, followerList] = await Promise.all([
         getGroups(),
         getGroupInvitations(),
+        getFollowers(),
       ]);
       setGroups(groupList || []);
       setInvitations(inviteList || []);
+      setFollowers(followerList || []);
       if (!selectedGroupId && groupList?.[0]) {
         setSelectedGroupId(groupList[0].id);
       }
@@ -72,13 +77,15 @@ export default function GroupsPage() {
 
     async function loadInitialGroups() {
       try {
-        const [groupList, inviteList] = await Promise.all([
+        const [groupList, inviteList, followerList] = await Promise.all([
           getGroups(),
           getGroupInvitations(),
+          getFollowers(),
         ]);
         if (!isMounted) return;
         setGroups(groupList || []);
         setInvitations(inviteList || []);
+        setFollowers(followerList || []);
         if (!selectedGroupId && groupList?.[0]) {
           setSelectedGroupId(groupList[0].id);
         }
@@ -125,10 +132,29 @@ export default function GroupsPage() {
   const selectedGroup = detail?.group;
   const isMember = Boolean(selectedGroup?.is_member);
   const isCreator = Boolean(detail?.requests);
-  const inviteeIds = useMemo(() => parseIDs(drafts.invitees), [drafts.invitees]);
+  const inviteeNicknames = useMemo(() => parseNicknames(drafts.invitees), [drafts.invitees]);
+  const minEventTime = formatDateTimeLocal(new Date());
+  const createInviteSuggestions = useMemo(
+    () => getMentionSuggestions(drafts.invitees, followers, true),
+    [drafts.invitees, followers],
+  );
+  const memberInviteSuggestions = useMemo(
+    () => getMentionSuggestions(drafts.inviteUser, followers, false),
+    [drafts.inviteUser, followers],
+  );
 
   function updateDraft(key, value) {
     setDrafts((current) => ({ ...current, [key]: value }));
+  }
+
+  function selectCreateInvite(nickname) {
+    updateDraft("invitees", replaceMentionToken(drafts.invitees, nickname, true));
+    setActiveInviteField("create");
+  }
+
+  function selectMemberInvite(nickname) {
+    updateDraft("inviteUser", `@${nickname}`);
+    setActiveInviteField("member");
   }
 
   async function handleCreateGroup(event) {
@@ -138,7 +164,7 @@ export default function GroupsPage() {
       const group = await createGroup({
         title: drafts.title,
         description: drafts.description,
-        inviteeIds,
+        inviteeNicknames,
       });
       setDrafts((current) => ({
         ...current,
@@ -188,11 +214,11 @@ export default function GroupsPage() {
 
   async function handleInvite(event) {
     event.preventDefault();
-    const userId = drafts.inviteUser.trim();
-    if (!userId || !selectedGroupId) return;
+    const nickname = normalizeNickname(drafts.inviteUser);
+    if (!nickname || !selectedGroupId) return;
     setError("");
     try {
-      await inviteToGroup(selectedGroupId, userId);
+      await inviteToGroup(selectedGroupId, nickname);
       updateDraft("inviteUser", "");
     } catch (err) {
       setError(err.message || "Could not invite user");
@@ -258,7 +284,16 @@ export default function GroupsPage() {
     event.preventDefault();
     setError("");
     try {
-      const eventTime = new Date(drafts.eventTime).toISOString();
+      const eventDate = new Date(drafts.eventTime);
+      if (!drafts.eventTime || Number.isNaN(eventDate.getTime())) {
+        setError("event title and day/time are required");
+        return;
+      }
+      if (eventDate <= new Date()) {
+        setError("event time must be in the future");
+        return;
+      }
+      const eventTime = eventDate.toISOString();
       const groupEvent = await createGroupEvent(selectedGroupId, {
         title: drafts.eventTitle,
         description: drafts.eventDescription,
@@ -329,11 +364,21 @@ export default function GroupsPage() {
               placeholder="Description"
               rows={3}
             />
-            <input
-              value={drafts.invitees}
-              onChange={(event) => updateDraft("invitees", event.target.value)}
-              placeholder="Invite user IDs, comma separated"
-            />
+            <div className={styles.suggestField}>
+              <input
+                value={drafts.invitees}
+                onFocus={() => setActiveInviteField("create")}
+                onBlur={() => setTimeout(() => setActiveInviteField(""), 120)}
+                onChange={(event) => updateDraft("invitees", event.target.value)}
+                placeholder="Invite nicknames, comma separated"
+              />
+              {activeInviteField === "create" && createInviteSuggestions.length > 0 && (
+                <InviteSuggestions
+                  users={createInviteSuggestions}
+                  onSelect={selectCreateInvite}
+                />
+              )}
+            </div>
             <button type="submit">Create</button>
           </form>
         </section>
@@ -475,6 +520,7 @@ export default function GroupsPage() {
                       <input
                         type="datetime-local"
                         value={drafts.eventTime}
+                        min={minEventTime}
                         onChange={(event) => updateDraft("eventTime", event.target.value)}
                       />
                       <button type="submit">Create event</button>
@@ -516,11 +562,22 @@ export default function GroupsPage() {
                       ))}
                     </div>
                     <form className={styles.inlineForm} onSubmit={handleInvite}>
-                      <input
-                        value={drafts.inviteUser}
-                        onChange={(event) => updateDraft("inviteUser", event.target.value)}
-                        placeholder="User ID"
-                      />
+                      <div className={styles.suggestField}>
+                        <input
+                          value={drafts.inviteUser}
+                          onFocus={() => setActiveInviteField("member")}
+                          onBlur={() => setTimeout(() => setActiveInviteField(""), 120)}
+                          onChange={(event) => updateDraft("inviteUser", event.target.value)}
+                          placeholder="Nickname"
+                        />
+                        {activeInviteField === "member" &&
+                          memberInviteSuggestions.length > 0 && (
+                            <InviteSuggestions
+                              users={memberInviteSuggestions}
+                              onSelect={selectMemberInvite}
+                            />
+                          )}
+                      </div>
                       <button type="submit">Invite</button>
                     </form>
                   </section>
@@ -563,11 +620,63 @@ export default function GroupsPage() {
   );
 }
 
-function parseIDs(value) {
+function InviteSuggestions({ users, onSelect }) {
+  return (
+    <div className={styles.suggestions} role="listbox">
+      {users.map((user) => {
+        const nickname = user.nickname || "";
+        return (
+          <button
+            key={user.id}
+            type="button"
+            role="option"
+            aria-selected="false"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              onSelect(nickname);
+            }}
+          >
+            <strong>@{nickname}</strong>
+            <span>{displayName(user)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function parseNicknames(value) {
   return value
     .split(",")
-    .map((item) => item.trim())
+    .map(normalizeNickname)
     .filter(Boolean);
+}
+
+function normalizeNickname(value) {
+  return value.trim().replace(/^@/, "");
+}
+
+function getMentionSuggestions(value, followers, allowCommaList) {
+  const mention = getActiveMention(value, allowCommaList);
+  if (!mention) return [];
+  const query = mention.slice(1).toLowerCase();
+  return followers.filter((user) => {
+    const nickname = user.nickname || "";
+    return nickname.toLowerCase().startsWith(query);
+  });
+}
+
+function getActiveMention(value, allowCommaList) {
+  const token = allowCommaList ? value.split(",").at(-1).trimStart() : value.trimStart();
+  return token.startsWith("@") ? token : "";
+}
+
+function replaceMentionToken(value, nickname, allowCommaList) {
+  const replacement = `@${nickname}`;
+  if (!allowCommaList) return replacement;
+  const parts = value.split(",");
+  parts[parts.length - 1] = ` ${replacement}`;
+  return `${parts.join(",").trimStart()}, `;
 }
 
 function displayName(user) {
@@ -603,4 +712,9 @@ function formatDate(value) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatDateTimeLocal(date) {
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }

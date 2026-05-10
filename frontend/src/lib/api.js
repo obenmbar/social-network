@@ -54,6 +54,10 @@ export async function getCurrentUser() {
   return fetchAPI("/me");
 }
 
+export async function getFollowers() {
+  return fetchAPI("/followers");
+}
+
 export async function logout() {
   return fetchAPI("/logout", "POST");
 }
@@ -106,11 +110,11 @@ export async function getGroups() {
   return fetchAPI("/groups");
 }
 
-export async function createGroup({ title, description, inviteeIds = [] }) {
+export async function createGroup({ title, description, inviteeNicknames = [] }) {
   return fetchAPI("/groups", "POST", {
     title,
     description,
-    invitee_ids: inviteeIds,
+    invitee_nicknames: inviteeNicknames,
   });
 }
 
@@ -122,8 +126,8 @@ export async function getGroupInvitations() {
   return fetchAPI("/groups/invitations");
 }
 
-export async function inviteToGroup(groupId, userId) {
-  return fetchAPI(`/groups/${groupId}/invite`, "POST", { user_id: userId });
+export async function inviteToGroup(groupId, nickname) {
+  return fetchAPI(`/groups/${groupId}/invite`, "POST", { nickname });
 }
 
 export async function respondToGroupInvitation(groupId, status) {

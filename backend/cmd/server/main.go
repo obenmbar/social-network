@@ -26,8 +26,7 @@ func main() {
 	dbPath := getEnv("DB_PATH", filepath.Join(projectRoot, "data", "social_network.db"))
 	migrationsPath := getEnv("MIGRATIONS_PATH", filepath.Join(projectRoot, "migrations", "sqlite"))
 	port := strings.TrimPrefix(getEnv("PORT", "8080"), ":")
-	rateLimitRequests := getEnvInt("RATE_LIMIT_REQUESTS", 120)
-	rateLimitWindow := getEnvDuration("RATE_LIMIT_WINDOW", time.Minute)
+	/* git */
 
 	// 1. Initialize Database
 	db, err := sqlite.Connect(dbPath)
@@ -54,13 +53,8 @@ func main() {
 	groupsHandler := groups.NewHandler(groupsService)
 
 	// Middlewares
-<<<<<<< HEAD
-	rateLimiter := middleware.NewRateLimiter(rateLimitRequests, rateLimitWindow)
-	sessionAuth := middleware.SessionMiddleware(authRepo)
-=======
 	rateLimiter := middleware.NewRateLimiter(20, time.Minute)
 	sessionAuth := middleware.SessionMiddleware(authService)
->>>>>>> mohnouri
 
 	// 4. Set up Routing (http.ServeMux)
 	mux := http.NewServeMux()
@@ -72,7 +66,7 @@ func main() {
 	// Protected routes
 	mux.Handle("/me", sessionAuth(http.HandlerFunc(authHandler.Me)))
 	mux.Handle("/logout", sessionAuth(http.HandlerFunc(authHandler.Logout)))
-	mux.Handle("/followers", sessionAuth(http.HandlerFunc(postsHandler.Followers)))
+	mux.Handle("/followers", sessionAuth(http.HandlerFunc(groupsHandler.Followers)))
 	mux.Handle("/posts", sessionAuth(http.HandlerFunc(postsHandler.CreatePost)))
 	mux.Handle("/posts/feed", sessionAuth(http.HandlerFunc(postsHandler.Feed)))
 	mux.Handle("/posts/{id}", sessionAuth(http.HandlerFunc(postsHandler.GetPost)))

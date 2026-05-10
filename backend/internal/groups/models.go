@@ -102,13 +102,13 @@ type PostDetail struct {
 }
 
 type CreateGroupRequest struct {
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	InviteeIDs  []string `json:"invitee_ids"`
+	Title            string   `json:"title"`
+	Description      string   `json:"description"`
+	InviteeNicknames []string `json:"invitee_nicknames"`
 }
 
 type InviteRequest struct {
-	UserID string `json:"user_id"`
+	Nickname string `json:"nickname"`
 }
 
 type CreatePostRequest struct {

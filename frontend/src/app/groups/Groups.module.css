@@ -97,6 +97,11 @@
   line-height: 1.4;
 }
 
+.suggestField {
+  position: relative;
+  min-width: 0;
+}
+
 .stackForm button,
 .composer button,
 .inlineForm button,
@@ -114,6 +119,46 @@
   font: inherit;
   font-size: 0.9rem;
   padding: 0 0.8rem;
+}
+
+.suggestions {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--surface);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 12%);
+}
+
+.suggestions button,
+.stackForm .suggestions button,
+.inlineForm .suggestions button {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  gap: 0.15rem;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  color: var(--foreground);
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+}
+
+.suggestions button:hover,
+.stackForm .suggestions button:hover,
+.inlineForm .suggestions button:hover {
+  background-color: var(--background);
+}
+
+.suggestions span {
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
 }
 
 .stackForm button:hover,
