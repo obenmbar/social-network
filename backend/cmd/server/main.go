@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,6 +26,8 @@ func main() {
 	dbPath := getEnv("DB_PATH", filepath.Join(projectRoot, "data", "social_network.db"))
 	migrationsPath := getEnv("MIGRATIONS_PATH", filepath.Join(projectRoot, "migrations", "sqlite"))
 	port := strings.TrimPrefix(getEnv("PORT", "8080"), ":")
+	rateLimitRequests := getEnvInt("RATE_LIMIT_REQUESTS", 120)
+	rateLimitWindow := getEnvDuration("RATE_LIMIT_WINDOW", time.Minute)
 
 	// 1. Initialize Database
 	db, err := sqlite.Connect(dbPath)
@@ -51,7 +54,7 @@ func main() {
 	groupsHandler := groups.NewHandler(groupsService)
 
 	// Middlewares
-	rateLimiter := middleware.NewRateLimiter(20, time.Minute)
+	rateLimiter := middleware.NewRateLimiter(rateLimitRequests, rateLimitWindow)
 	sessionAuth := middleware.SessionMiddleware(authRepo)
 
 	// 4. Set up Routing (http.ServeMux)
@@ -107,4 +110,34 @@ func getEnv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func getEnvInt(key string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		log.Printf("Invalid %s=%q; using %d", key, value, fallback)
+		return fallback
+	}
+
+	return parsed
+}
+
+func getEnvDuration(key string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		log.Printf("Invalid %s=%q; using %s", key, value, fallback)
+		return fallback
+	}
+
+	return parsed
 }

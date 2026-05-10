@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -164,7 +165,8 @@ func (rl *RateLimiter) Middleware() func(http.Handler) http.Handler {
 
 			if c.requests > rl.limit {
 				rl.mu.Unlock()
-				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+				w.Header().Set("Retry-After", strconv.Itoa(int(rl.window.Seconds())))
+				writeJSONError(w, "Too many requests. Please try again shortly.", http.StatusTooManyRequests)
 				return
 			}
 			rl.mu.Unlock()

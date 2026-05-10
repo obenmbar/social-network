@@ -102,12 +102,81 @@ export async function createComment(postId, { content, image }) {
   return fetchAPI(`/posts/${postId}/comments`, "POST", formData);
 }
 
+export async function getGroups() {
+  return fetchAPI("/groups");
+}
+
+export async function createGroup({ title, description, inviteeIds = [] }) {
+  return fetchAPI("/groups", "POST", {
+    title,
+    description,
+    invitee_ids: inviteeIds,
+  });
+}
+
+export async function getGroup(groupId) {
+  return fetchAPI(`/groups/${groupId}`);
+}
+
+export async function getGroupInvitations() {
+  return fetchAPI("/groups/invitations");
+}
+
+export async function inviteToGroup(groupId, userId) {
+  return fetchAPI(`/groups/${groupId}/invite`, "POST", { user_id: userId });
+}
+
+export async function respondToGroupInvitation(groupId, status) {
+  return fetchAPI(`/groups/${groupId}/invitations/${status}`, "POST");
+}
+
+export async function requestToJoinGroup(groupId) {
+  return fetchAPI(`/groups/${groupId}/requests`, "POST");
+}
+
+export async function respondToGroupJoinRequest(groupId, userId, status) {
+  return fetchAPI(`/groups/${groupId}/requests/${userId}/${status}`, "POST");
+}
+
+export async function createGroupPost(groupId, content) {
+  return fetchAPI(`/groups/${groupId}/posts`, "POST", { content });
+}
+
+export async function getGroupPost(groupId, postId) {
+  return fetchAPI(`/groups/${groupId}/posts/${postId}`);
+}
+
+export async function createGroupComment(groupId, postId, content) {
+  return fetchAPI(`/groups/${groupId}/posts/${postId}/comments`, "POST", {
+    content,
+  });
+}
+
+export async function createGroupEvent(groupId, { title, description, eventTime }) {
+  return fetchAPI(`/groups/${groupId}/events`, "POST", {
+    title,
+    description,
+    event_time: eventTime,
+  });
+}
+
+export async function respondToGroupEvent(groupId, eventId, response) {
+  return fetchAPI(`/groups/${groupId}/events/${eventId}/responses`, "POST", {
+    response,
+  });
+}
+
 export function mediaUrl(path) {
   if (!path) {
     return "";
   }
 
-  if (path.startsWith("http://") || path.startsWith("https://")) {
+  if (
+    path.startsWith("http://") ||
+    path.startsWith("https://") ||
+    path.startsWith("data:") ||
+    path.startsWith("blob:")
+  ) {
     return path;
   }
 

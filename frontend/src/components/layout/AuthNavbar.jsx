@@ -21,7 +21,6 @@ export default function AuthNavbar({ user }) {
       setIsLoading(false);
     }
   };
-
   return (
     <header className={styles.navbar}>
       <Link href="/" className={styles.titleLink}>
@@ -29,6 +28,10 @@ export default function AuthNavbar({ user }) {
       </Link>
 
       <nav className={styles.navActions} aria-label="Main navigation">
+        <Link href="/groups" className={styles.navLink}>
+          Groups
+        </Link>
+
         <button type="button" className={styles.iconButton} aria-label="Messages">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-6.3A8 8 0 1 1 21 12Z" />
