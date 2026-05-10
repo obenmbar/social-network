@@ -124,7 +124,7 @@ export default function GroupsPage() {
   const selectedGroup = detail?.group;
   const isMember = Boolean(selectedGroup?.is_member);
   const isCreator = Boolean(detail?.requests);
-  const inviteeIds = useMemo(() => parseIDs(drafts.invitees), [drafts.invitees]);
+  const inviteeNicknames = useMemo(() => parseNicknames(drafts.invitees), [drafts.invitees]);
   const minEventTime = formatDateTimeLocal(new Date());
 
   function updateDraft(key, value) {
@@ -138,7 +138,7 @@ export default function GroupsPage() {
       const group = await createGroup({
         title: drafts.title,
         description: drafts.description,
-        inviteeIds,
+        inviteeNicknames,
       });
       setDrafts((current) => ({
         ...current,
@@ -188,11 +188,11 @@ export default function GroupsPage() {
 
   async function handleInvite(event) {
     event.preventDefault();
-    const userId = drafts.inviteUser.trim();
-    if (!userId || !selectedGroupId) return;
+    const nickname = normalizeNickname(drafts.inviteUser);
+    if (!nickname || !selectedGroupId) return;
     setError("");
     try {
-      await inviteToGroup(selectedGroupId, userId);
+      await inviteToGroup(selectedGroupId, nickname);
       updateDraft("inviteUser", "");
     } catch (err) {
       setError(err.message || "Could not invite user");
@@ -341,7 +341,7 @@ export default function GroupsPage() {
             <input
               value={drafts.invitees}
               onChange={(event) => updateDraft("invitees", event.target.value)}
-              placeholder="Invite user IDs, comma separated"
+              placeholder="Invite nicknames, comma separated"
             />
             <button type="submit">Create</button>
           </form>
@@ -523,7 +523,7 @@ export default function GroupsPage() {
                       <input
                         value={drafts.inviteUser}
                         onChange={(event) => updateDraft("inviteUser", event.target.value)}
-                        placeholder="User ID"
+                        placeholder="Nickname"
                       />
                       <button type="submit">Invite</button>
                     </form>
@@ -567,11 +567,15 @@ export default function GroupsPage() {
   );
 }
 
-function parseIDs(value) {
+function parseNicknames(value) {
   return value
     .split(",")
-    .map((item) => item.trim())
+    .map(normalizeNickname)
     .filter(Boolean);
+}
+
+function normalizeNickname(value) {
+  return value.trim().replace(/^@/, "");
 }
 
 function displayName(user) {

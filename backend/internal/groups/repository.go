@@ -90,14 +90,6 @@ func (r *Repository) IsCreator(groupID, userID string) (bool, error) {
 	return exists, nil
 }
 
-func (r *Repository) UserExists(userID string) (bool, error) {
-	var exists bool
-	if err := r.db.QueryRow(`SELECT EXISTS (SELECT 1 FROM users WHERE id = ?)`, userID).Scan(&exists); err != nil {
-		return false, fmt.Errorf("failed to check user: %w", err)
-	}
-	return exists, nil
-}
-
 func (r *Repository) GetUserIDByNickname(nickname string) (string, error) {
 	var userID string
 	err := r.db.QueryRow(`SELECT id FROM users WHERE nickname = ?`, nickname).Scan(&userID)

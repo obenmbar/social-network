@@ -290,19 +290,6 @@ func (s *Service) requireMember(groupID, userID string) error {
 	return nil
 }
 
-func (s *Service) requireExistingUsers(userIDs []string) error {
-	for _, userID := range userIDs {
-		exists, err := s.repo.UserExists(userID)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return ErrUserNotFound
-		}
-	}
-	return nil
-}
-
 func (s *Service) userIDsByNicknames(nicknames []string) ([]string, error) {
 	nicknames = uniqueNicknames(nicknames)
 	userIDs := make([]string, 0, len(nicknames))
@@ -325,20 +312,6 @@ func (s *Service) userIDByNickname(nickname string) (string, error) {
 		return "", ErrUserNotFound
 	}
 	return userID, nil
-}
-
-func uniqueStrings(values []string) []string {
-	seen := make(map[string]bool)
-	unique := []string{}
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value == "" || seen[value] {
-			continue
-		}
-		seen[value] = true
-		unique = append(unique, value)
-	}
-	return unique
 }
 
 func uniqueNicknames(values []string) []string {
