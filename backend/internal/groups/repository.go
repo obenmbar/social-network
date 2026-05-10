@@ -90,6 +90,14 @@ func (r *Repository) IsCreator(groupID, userID string) (bool, error) {
 	return exists, nil
 }
 
+func (r *Repository) UserExists(userID string) (bool, error) {
+	var exists bool
+	if err := r.db.QueryRow(`SELECT EXISTS (SELECT 1 FROM users WHERE id = ?)`, userID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("failed to check user: %w", err)
+	}
+	return exists, nil
+}
+
 func (r *Repository) InviteUser(groupID, inviterID, inviteeID string) error {
 	_, err := r.db.Exec(`INSERT OR IGNORE INTO group_invitations (group_id, inviter_id, invitee_id, status) VALUES (?, ?, ?, ?)`, groupID, inviterID, inviteeID, InvitationPending)
 	if err != nil {

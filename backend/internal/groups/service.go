@@ -16,6 +16,8 @@ var (
 	ErrEmptyContent  = errors.New("content is required")
 	ErrEmptyEvent    = errors.New("event title and day/time are required")
 	ErrInvalidStatus = errors.New("invalid status")
+	ErrUserRequired  = errors.New("user is required")
+	ErrUserNotFound  = errors.New("user not found")
 )
 
 type Service struct {
@@ -40,7 +42,11 @@ func (s *Service) CreateGroup(userID string, req CreateGroupRequest) (*Group, er
 		Title:       req.Title,
 		Description: req.Description,
 	}
-	if err := s.repo.CreateGroup(group, uniqueStrings(req.InviteeIDs)); err != nil {
+	inviteeIDs := uniqueStrings(req.InviteeIDs)
+	if err := s.requireExistingUsers(inviteeIDs); err != nil {
+		return nil, err
+	}
+	if err := s.repo.CreateGroup(group, inviteeIDs); err != nil {
 		return nil, err
 	}
 	return s.repo.GetGroupByID(userID, group.ID)
@@ -97,9 +103,12 @@ func (s *Service) GetGroup(userID, groupID string) (*GroupDetail, error) {
 func (s *Service) InviteUser(userID, groupID string, req InviteRequest) error {
 	req.UserID = strings.TrimSpace(req.UserID)
 	if req.UserID == "" {
-		return ErrInvalidStatus
+		return ErrUserRequired
 	}
 	if err := s.requireMember(groupID, userID); err != nil {
+		return err
+	}
+	if err := s.requireExistingUsers([]string{req.UserID}); err != nil {
 		return err
 	}
 	return s.repo.InviteUser(groupID, userID, req.UserID)
@@ -272,6 +281,19 @@ func (s *Service) requireMember(groupID, userID string) error {
 	}
 	if !group.IsMember {
 		return ErrUnauthorized
+	}
+	return nil
+}
+
+func (s *Service) requireExistingUsers(userIDs []string) error {
+	for _, userID := range userIDs {
+		exists, err := s.repo.UserExists(userID)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return ErrUserNotFound
+		}
 	}
 	return nil
 }
