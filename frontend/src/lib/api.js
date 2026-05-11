@@ -66,10 +66,6 @@ export async function getFeed() {
   return fetchAPI("/posts/feed");
 }
 
-export async function getFollowers() {
-  return fetchAPI("/followers");
-}
-
 export async function createPost({ title, content, privacy, allowedUserIds = [], image }) {
   validateImageSize(image);
 
@@ -175,16 +171,12 @@ export function mediaUrl(path) {
     return "";
   }
 
-<<<<<<< HEAD
   if (
     path.startsWith("http://") ||
     path.startsWith("https://") ||
     path.startsWith("data:") ||
     path.startsWith("blob:")
   ) {
-=======
-  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
->>>>>>> mohnouri
     return path;
   }
 

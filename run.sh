@@ -7,12 +7,32 @@ cd "$ROOT_DIR"
 
 echo "Starting Social Network Services..."
 
+find_free_port() {
+  local port="$1"
+
+  while lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; do
+    port=$((port + 1))
+  done
+
+  echo "$port"
+}
+
+BACKEND_PORT="${PORT:-8080}"
+BACKEND_PORT="$(find_free_port "$BACKEND_PORT")"
+BACKEND_URL="http://127.0.0.1:${BACKEND_PORT}"
+
 # Start backend in the background
 echo "-> Starting Backend (Go)..."
 cd backend
-go run cmd/server/main.go &
+PORT="$BACKEND_PORT" go run cmd/server/main.go &
 BACKEND_PID=$!
 cd "$ROOT_DIR"
+
+sleep 1
+if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+  echo "Backend failed to start."
+  exit 1
+fi
 
 # Start frontend in the background
 echo "-> Starting Frontend (Next.js)..."
@@ -21,13 +41,13 @@ if [ ! -d node_modules ]; then
   echo "-> Installing frontend dependencies..."
   npm install
 fi
-npm run dev -- -H 127.0.0.1 &
+BACKEND_URL="$BACKEND_URL" npm run dev -- -H 127.0.0.1 &
 FRONTEND_PID=$!
 cd "$ROOT_DIR"
 
 echo ""
 echo "Services are running!"
-echo "Backend: http://localhost:8080"
+echo "Backend: $BACKEND_URL"
 echo "Frontend: check the Next.js output above for the active port, usually http://127.0.0.1:3000"
 echo "Press Ctrl+C to stop both."
 

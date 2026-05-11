@@ -53,7 +53,9 @@ func main() {
 	groupsHandler := groups.NewHandler(groupsService)
 
 	// Middlewares
-	rateLimiter := middleware.NewRateLimiter(20, time.Minute)
+	rateLimitRequests := getEnvInt("RATE_LIMIT_REQUESTS", 120)
+	rateLimitWindow := getEnvDuration("RATE_LIMIT_WINDOW", time.Minute)
+	rateLimiter := middleware.NewRateLimiter(rateLimitRequests, rateLimitWindow)
 	sessionAuth := middleware.SessionMiddleware(authService)
 
 	// 4. Set up Routing (http.ServeMux)

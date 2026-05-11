@@ -95,8 +95,8 @@ func writeJSONError(w http.ResponseWriter, message string, status int) {
 }
 
 type client struct {
-	requests int
-	lastSeen time.Time
+	requests    int
+	windowStart time.Time
 }
 
 type RateLimiter struct {
@@ -120,7 +120,7 @@ func NewRateLimiter(limit int, window time.Duration) *RateLimiter {
 			time.Sleep(window)
 			rl.mu.Lock()
 			for ip, c := range rl.clients {
-				if time.Since(c.lastSeen) > window {
+				if time.Since(c.windowStart) > window {
 					delete(rl.clients, ip)
 				}
 			}
@@ -144,21 +144,27 @@ func (rl *RateLimiter) Middleware() func(http.Handler) http.Handler {
 			rl.mu.Lock()
 			c, exists := rl.clients[ip]
 			if !exists {
-				c = &client{requests: 0, lastSeen: time.Now()}
+				c = &client{requests: 0, windowStart: time.Now()}
 				rl.clients[ip] = c
 			}
 
 			// Reset window if it has passed
-			if time.Since(c.lastSeen) > rl.window {
+			elapsed := time.Since(c.windowStart)
+			if elapsed > rl.window {
 				c.requests = 0
-				c.lastSeen = time.Now()
+				c.windowStart = time.Now()
+				elapsed = 0
 			}
 
 			c.requests++
 
 			if c.requests > rl.limit {
+				retryAfter := int((rl.window - elapsed).Seconds())
+				if retryAfter < 1 {
+					retryAfter = 1
+				}
 				rl.mu.Unlock()
-				w.Header().Set("Retry-After", strconv.Itoa(int(rl.window.Seconds())))
+				w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 				writeJSONError(w, "Too many requests. Please try again shortly.", http.StatusTooManyRequests)
 				return
 			}
