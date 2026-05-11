@@ -53,8 +53,8 @@ func main() {
 	groupsHandler := groups.NewHandler(groupsService)
 
 	// Middlewares
-	rateLimitRequests := getEnvInt("RATE_LIMIT_REQUESTS", 120)
-	rateLimitWindow := getEnvDuration("RATE_LIMIT_WINDOW", time.Minute)
+	rateLimitRequests := getEnvInt("RATE_LIMIT_REQUESTS", 20)
+	rateLimitWindow := getEnvDuration("RATE_LIMIT_WINDOW", 10*time.Second)
 	rateLimiter := middleware.NewRateLimiter(rateLimitRequests, rateLimitWindow)
 	sessionAuth := middleware.SessionMiddleware(authService)
 

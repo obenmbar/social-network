@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -135,17 +136,17 @@ func NewRateLimiter(limit int, window time.Duration) *RateLimiter {
 func (rl *RateLimiter) Middleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				// Fallback to RemoteAddr if port is missing
-				ip = r.RemoteAddr
+			key := rateLimitKey(r)
+			limit := rl.limit
+			if isAuthWrite(r) && limit > 5 {
+				limit = 5
 			}
 
 			rl.mu.Lock()
-			c, exists := rl.clients[ip]
+			c, exists := rl.clients[key]
 			if !exists {
 				c = &client{requests: 0, windowStart: time.Now()}
-				rl.clients[ip] = c
+				rl.clients[key] = c
 			}
 
 			// Reset window if it has passed
@@ -158,7 +159,7 @@ func (rl *RateLimiter) Middleware() func(http.Handler) http.Handler {
 
 			c.requests++
 
-			if c.requests > rl.limit {
+			if c.requests > limit {
 				retryAfter := int((rl.window - elapsed).Seconds())
 				if retryAfter < 1 {
 					retryAfter = 1
@@ -173,4 +174,36 @@ func (rl *RateLimiter) Middleware() func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func rateLimitKey(r *http.Request) string {
+	return clientAddress(r) + " " + r.Method + " " + r.URL.Path
+}
+
+func isAuthWrite(r *http.Request) bool {
+	if r.Method != http.MethodPost {
+		return false
+	}
+
+	return r.URL.Path == "/login" || r.URL.Path == "/register"
+}
+
+func clientAddress(r *http.Request) string {
+	if forwardedFor := r.Header.Get("X-Forwarded-For"); forwardedFor != "" {
+		parts := strings.Split(forwardedFor, ",")
+		if ip := strings.TrimSpace(parts[0]); ip != "" {
+			return ip
+		}
+	}
+
+	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
+		return realIP
+	}
+
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+
+	return ip
 }
