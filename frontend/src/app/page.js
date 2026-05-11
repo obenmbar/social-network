@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
+  ApiError,
   createComment,
   createPost,
   getCurrentUser,
@@ -49,9 +50,13 @@ export default function Feed() {
           setFollowers(followerList || []);
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (isMounted) {
-          router.replace("/login");
+          if (err instanceof ApiError && err.status === 401) {
+            router.replace("/login");
+          } else {
+            setError(err.message || "Could not load feed");
+          }
         }
       })
       .finally(() => {
