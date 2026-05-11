@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
 import { validateAuthFields } from "@/lib/authValidation";
+import { saveSession } from "@/lib/session";
 import Notification from "@/components/ui/Notification";
 import styles from "./LoginForm.module.css";
 
@@ -35,6 +36,7 @@ export default function LoginForm() {
       }
 
       await login(credentials.email, credentials.password);
+      saveSession();
       setNotification({ message: "Login successful! Redirecting...", type: "success" });
       setTimeout(() => {
         router.replace("/");

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/lib/api";
+import { removeSession } from "@/lib/session";
 import styles from "./AuthNavbar.module.css";
 
 export default function AuthNavbar({ user }) {
@@ -16,8 +17,9 @@ export default function AuthNavbar({ user }) {
 
     try {
       await logout();
-      router.replace("/login");
     } finally {
+      removeSession();
+      router.replace("/login");
       setIsLoading(false);
     }
   };
