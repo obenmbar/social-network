@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ApiError, getCurrentUser } from "@/lib/api";
+import { getCurrentUser, isUnauthorized, logout } from "@/lib/api";
 import { hasSession, removeSession, sessionStorageKey } from "@/lib/session";
 import AuthNavbar from "./AuthNavbar";
 
@@ -14,13 +14,14 @@ export default function AppShell({ children }) {
   const [user, setUser] = useState(null);
 
   const isAuthRoute = authRoutes.has(pathname);
-  const sessionExists = hasSession();
+  const hasLocalSession = hasSession();
 
   useEffect(() => {
     let isMounted = true;
 
-    if (!sessionExists) {
+    if (!hasLocalSession) {
       if (!isAuthRoute) {
+        logout().catch(() => {});
         router.replace("/login");
       }
       return () => {
@@ -43,7 +44,7 @@ export default function AppShell({ children }) {
       })
       .catch((err) => {
         if (isMounted) {
-          if (err instanceof ApiError && err.status === 401) {
+          if (isUnauthorized(err)) {
             setUser(null);
             removeSession();
             router.replace("/login");
@@ -54,7 +55,7 @@ export default function AppShell({ children }) {
     return () => {
       isMounted = false;
     };
-  }, [isAuthRoute, router, sessionExists]);
+  }, [hasLocalSession, isAuthRoute, router]);
 
   useEffect(() => {
     const handleStorage = (event) => {
@@ -71,6 +72,7 @@ export default function AppShell({ children }) {
 
       setUser(null);
       if (!authRoutes.has(window.location.pathname)) {
+        logout().catch(() => {});
         router.replace("/login");
       }
     };
@@ -79,11 +81,42 @@ export default function AppShell({ children }) {
     return () => window.removeEventListener("storage", handleStorage);
   }, [router]);
 
+  useEffect(() => {
+    const logoutIfLocalSessionWasRemoved = () => {
+      if (authRoutes.has(window.location.pathname)) {
+        return;
+      }
+      if (hasSession()) {
+        return;
+      }
+
+      setUser(null);
+      logout().catch(() => {});
+      if (!authRoutes.has(window.location.pathname)) {
+        router.replace("/login");
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        logoutIfLocalSessionWasRemoved();
+      }
+    };
+
+    window.addEventListener("focus", logoutIfLocalSessionWasRemoved);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", logoutIfLocalSessionWasRemoved);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [router]);
+
   if (isAuthRoute) {
     return children;
   }
 
-  if (!sessionExists || !user) {
+  if (!hasLocalSession || !user) {
     return null;
   }
 

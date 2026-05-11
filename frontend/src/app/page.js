@@ -3,13 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ApiError,
   createComment,
   createPost,
   getCurrentUser,
   getFeed,
   getFollowers,
   getPost,
+  isUnauthorized,
   mediaUrl,
 } from "@/lib/api";
 import styles from "./Feed.module.css";
@@ -52,7 +52,7 @@ export default function Feed() {
       })
       .catch((err) => {
         if (isMounted) {
-          if (err instanceof ApiError && err.status === 401) {
+          if (isUnauthorized(err)) {
             router.replace("/login");
           } else {
             setError(err.message || "Could not load feed");

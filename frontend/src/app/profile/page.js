@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiError, getCurrentUser, mediaUrl } from "@/lib/api";
+import { getCurrentUser, isUnauthorized, mediaUrl } from "@/lib/api";
 import styles from "./Profile.module.css";
 
 export default function ProfilePage() {
@@ -20,7 +20,7 @@ export default function ProfilePage() {
       })
       .catch((err) => {
         if (isMounted) {
-          if (err instanceof ApiError && err.status === 401) {
+          if (isUnauthorized(err)) {
             router.replace("/login");
           }
         }

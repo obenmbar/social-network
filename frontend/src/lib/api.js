@@ -3,17 +3,6 @@ import { removeSession } from "./session";
 const API_BASE = "/api/path";
 const MAX_IMAGE_SIZE = 10 << 20;
 
-export class ApiError extends Error {
-  constructor(message, status) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-  }
-}
-
-/**
- * Handles backend requests with credentials to pass cookies automatically.
- */
 async function fetchAPI(endpoint, method = "GET", body = null) {
   const isFormData = body instanceof FormData;
   const options = {
@@ -21,7 +10,7 @@ async function fetchAPI(endpoint, method = "GET", body = null) {
     headers: isFormData ? {} : {
       "Content-Type": "application/json",
     },
-    credentials: "include", // Essential for Go session cookies
+    credentials: "include",
   };
 
   if (body) {
@@ -32,10 +21,14 @@ async function fetchAPI(endpoint, method = "GET", body = null) {
   
   if (!res.ok) {
     const errorMessage = await getErrorMessage(res);
+    const error = new Error(errorMessage || `API Error: ${res.status}`);
+    error.status = res.status;
+
     if (res.status === 401) {
       removeSession();
     }
-    throw new ApiError(errorMessage || `API Error: ${res.status}`, res.status);
+
+    throw error;
   }
 
   if (res.status === 204) {
@@ -198,6 +191,10 @@ export function mediaUrl(path) {
 
 function apiUrl(endpoint) {
   return `${API_BASE}?target=${encodeURIComponent(endpoint)}`;
+}
+
+export function isUnauthorized(err) {
+  return err?.status === 401;
 }
 
 function validateImageSize(image) {
