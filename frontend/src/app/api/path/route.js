@@ -14,21 +14,33 @@ const hopByHopHeaders = new Set([
 ]);
 
 const SESSION_COOKIE = "session_token";
-const sessionTokenPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_SESSION_TOKEN_LENGTH = 128;
+const MAX_PROXY_BODY_BYTES = 11 << 20;
 
-async function handler(request, { params }) {
+async function handler(request) {
   const backendUrl = process.env.BACKEND_URL || "http://localhost:8080";
-  const path = (await params).path.join("/");
-  const targetUrl = new URL(`/${path}`, backendUrl);
-  targetUrl.search = new URL(request.url).search;
+  const requestUrl = new URL(request.url);
+  const target = requestUrl.searchParams.get("target");
+
+  if (!target || !target.startsWith("/") || target.startsWith("//")) {
+    return NextResponse.json({ error: "Invalid API path" }, { status: 400 });
+  }
+
+  const targetUrl = new URL(target, backendUrl);
+  requestUrl.searchParams.forEach((value, key) => {
+    if (key !== "target") {
+      targetUrl.searchParams.append(key, value);
+    }
+  });
 
   const headers = new Headers();
   copyHeader(request.headers, headers, "accept");
   copyHeader(request.headers, headers, "content-type");
+  copyClientAddress(request, headers);
 
   const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
-  if (sessionToken && !sessionTokenPattern.test(sessionToken)) {
-    return clearSessionResponse("Invalid session", 401);
+  if (sessionToken && sessionToken.length > MAX_SESSION_TOKEN_LENGTH) {
+    return clearSessionResponse("Request headers too large", 431);
   }
   if (sessionToken) {
     headers.set("cookie", `session_token=${sessionToken}`);
@@ -36,6 +48,11 @@ async function handler(request, { params }) {
 
   const method = request.method;
   const hasBody = method !== "GET" && method !== "HEAD";
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (hasBody && contentLength > MAX_PROXY_BODY_BYTES) {
+    return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+  }
+
   const response = await fetch(targetUrl, {
     method,
     headers,
@@ -51,7 +68,8 @@ async function handler(request, { params }) {
     }
   });
 
-  const nextResponse = new NextResponse(response.body, {
+  const responseBody = canHaveBody(response.status) ? await response.arrayBuffer() : null;
+  const nextResponse = new NextResponse(responseBody, {
     status: response.status,
     statusText: response.statusText,
     headers: responseHeaders,
@@ -77,6 +95,18 @@ function copyHeader(from, to, name) {
   }
 }
 
+function copyClientAddress(request, headers) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  const realIP = request.headers.get("x-real-ip");
+
+  if (forwardedFor) {
+    headers.set("x-forwarded-for", forwardedFor);
+  }
+  if (realIP) {
+    headers.set("x-real-ip", realIP);
+  }
+}
+
 function clearSessionResponse(message, status) {
   const response = NextResponse.json({ error: message }, { status });
   appendClearSessionCookies(response.headers);
@@ -87,6 +117,10 @@ function appendClearSessionCookies(headers) {
   const cookieBase = `${SESSION_COOKIE}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax`;
   headers.append("set-cookie", `${cookieBase}; Path=/`);
   headers.append("set-cookie", `${cookieBase}; Path=/api`);
+}
+
+function canHaveBody(status) {
+  return status !== 204 && status !== 304;
 }
 
 export const GET = handler;

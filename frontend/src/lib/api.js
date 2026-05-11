@@ -1,5 +1,15 @@
-const API_BASE = "/api";
+import { removeSession } from "./session";
+
+const API_BASE = "/api/path";
 const MAX_IMAGE_SIZE = 10 << 20;
+
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
 /**
  * Handles backend requests with credentials to pass cookies automatically.
@@ -18,11 +28,14 @@ async function fetchAPI(endpoint, method = "GET", body = null) {
     options.body = isFormData ? body : JSON.stringify(body);
   }
 
-  const res = await fetch(`${API_BASE}${endpoint}`, options);
+  const res = await fetch(apiUrl(endpoint), options);
   
   if (!res.ok) {
     const errorMessage = await getErrorMessage(res);
-    throw new Error(errorMessage || `API Error: ${res.status}`);
+    if (res.status === 401) {
+      removeSession();
+    }
+    throw new ApiError(errorMessage || `API Error: ${res.status}`, res.status);
   }
 
   if (res.status === 204) {
@@ -180,7 +193,11 @@ export function mediaUrl(path) {
     return path;
   }
 
-  return `${API_BASE}/${path.replace(/^\/+/, "")}`;
+  return apiUrl(`/${path.replace(/^\/+/, "")}`);
+}
+
+function apiUrl(endpoint) {
+  return `${API_BASE}?target=${encodeURIComponent(endpoint)}`;
 }
 
 function validateImageSize(image) {
