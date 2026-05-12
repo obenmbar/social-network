@@ -56,10 +56,14 @@
 .profilePanel h1 {
   margin: 0;
   font-size: 1.5rem;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .nickname,
 .about {
   margin: 0.25rem 0 0;
   color: var(--muted-foreground);
+  word-break: break-word;
+  overflow-wrap: break-word;
 }

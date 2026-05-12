@@ -8,6 +8,13 @@ const allowedAvatarTypes = new Set([
 ]);
 const maxAvatarBytes = 2 * 1024 * 1024;
 
+export const MinNameLen = 2;
+export const MaxNameLen = 10;
+export const MinNicknameLen = 2;
+export const MaxNicknameLen = 15;
+export const MinAboutMeLen = 2;
+export const MaxAboutMeLen = 50;
+
 export function isValidEmail(email) {
   return emailPattern.test(email.trim());
 }
@@ -27,12 +34,26 @@ export function isValidPassword(password) {
   return true;
 }
 
-export function validateAuthFields({ email, password }) {
+export function validateAuthFields(data) {
+  const { email, password, first_name, last_name, nickname, about_me } = data;
+
   if (!isValidEmail(email)) {
     return "Email must be valid and start with a letter or digit.";
   }
   if (!isValidPassword(password)) {
     return "Password must be 8 to 24 ASCII characters.";
+  }
+  if (first_name !== undefined && (first_name.length < MinNameLen || first_name.length > MaxNameLen)) {
+    return `First name must be ${MinNameLen} to ${MaxNameLen} characters.`;
+  }
+  if (last_name !== undefined && (last_name.length < MinNameLen || last_name.length > MaxNameLen)) {
+    return `Last name must be ${MinNameLen} to ${MaxNameLen} characters.`;
+  }
+  if (nickname !== undefined && nickname && (nickname.length < MinNicknameLen || nickname.length > MaxNicknameLen)) {
+    return `Nickname must be ${MinNicknameLen} to ${MaxNicknameLen} characters.`;
+  }
+  if (about_me !== undefined && about_me && (about_me.length < MinAboutMeLen || about_me.length > MaxAboutMeLen)) {
+    return `About me must be ${MinAboutMeLen} to ${MaxAboutMeLen} characters.`;
   }
   return "";
 }

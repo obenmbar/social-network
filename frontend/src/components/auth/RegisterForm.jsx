@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { register } from "@/lib/api";
-import { validateAuthFields, validateAvatarFile, validateSafeText } from "@/lib/authValidation";
+import { validateAuthFields, validateAvatarFile, validateSafeText, MinNameLen, MaxNameLen, MinNicknameLen, MaxNicknameLen, MinAboutMeLen, MaxAboutMeLen } from "@/lib/authValidation";
 import Notification from "@/components/ui/Notification";
 import styles from "./RegisterForm.module.css";
 
@@ -156,6 +156,8 @@ export default function RegisterForm() {
             type="text"
             value={formData.nickname}
             onChange={handleChange}
+            minLength={MinNicknameLen}
+            maxLength={MaxNicknameLen}
           />
         </div>
 
@@ -168,6 +170,8 @@ export default function RegisterForm() {
             value={formData.first_name}
             onChange={handleChange}
             required
+            minLength={MinNameLen}
+            maxLength={MaxNameLen}
           />
         </div>
 
@@ -180,6 +184,8 @@ export default function RegisterForm() {
             value={formData.last_name}
             onChange={handleChange}
             required
+            minLength={MinNameLen}
+            maxLength={MaxNameLen}
           />
         </div>
 
@@ -219,6 +225,8 @@ export default function RegisterForm() {
             value={formData.about_me}
             onChange={handleChange}
             rows="3"
+            minLength={MinAboutMeLen}
+            maxLength={MaxAboutMeLen}
             style={{ padding: "0.75rem", borderRadius: "4px", border: "1px solid var(--border)", fontSize: "1rem", fontFamily: "inherit" }}
           ></textarea>
         </div>

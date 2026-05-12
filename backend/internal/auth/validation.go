@@ -14,16 +14,29 @@ import (
 const maxAvatarBytes = 2 * 1024 * 1024
 
 var (
-	ErrInvalidEmail    = errors.New("email must be valid and start with a letter or digit")
-	ErrInvalidPassword = errors.New("password must be 8 to 24 ASCII characters")
-	ErrInvalidAvatar   = errors.New("avatar must be a PNG, JPG, JPEG, WEBP, or GIF image under 2MB")
-	ErrInvalidText     = errors.New("text fields cannot contain HTML characters")
-	ErrInvalidAge      = errors.New("age must be between 18 and 70")
+	ErrInvalidEmail     = errors.New("email must be valid and start with a letter or digit")
+	ErrInvalidPassword  = errors.New("password must be 8 to 24 ASCII characters")
+	ErrInvalidAvatar    = errors.New("avatar must be a PNG, JPG, JPEG, WEBP, or GIF image under 2MB")
+	ErrInvalidText      = errors.New("text fields cannot contain HTML characters")
+	ErrInvalidAge       = errors.New("age must be between 18 and 70")
+	ErrInvalidFirstName = errors.New("first name must be 2 to 10 characters")
+	ErrInvalidLastName  = errors.New("last name must be 2 to 10 characters")
+	ErrInvalidNickname  = errors.New("nickname must be 2 to 15 characters")
+	ErrInvalidAboutMe   = errors.New("about me must be 2 to 50 characters")
 
 	emailPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._%+\-]*@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$`)
 	avatarDataURLRe = regexp.MustCompile(`^data:image/(png|jpeg|jpg|webp|gif);base64,([A-Za-z0-9+/]+={0,2})$`)
 	htmlUnsafeChars = regexp.MustCompile(`[<>]`)
 	allowedGenders  = map[string]bool{"male": true, "female": true}
+)
+
+const (
+	MinNameLen     = 2
+	MaxNameLen     = 10
+	MinNicknameLen = 2
+	MaxNicknameLen = 15
+	MinAboutMeLen  = 2
+	MaxAboutMeLen  = 50
 )
 
 func NormalizeRegisterRequest(req *RegisterRequest) {
@@ -53,6 +66,18 @@ func ValidateRegisterRequest(req RegisterRequest) error {
 	}
 	if !isSafeText(req.FirstName) || !isSafeText(req.LastName) || !isSafeOptionalText(req.Nickname) || !isSafeOptionalText(req.AboutMe) {
 		return ErrInvalidText
+	}
+	if len(req.FirstName) < MinNameLen || len(req.FirstName) > MaxNameLen {
+		return ErrInvalidFirstName
+	}
+	if len(req.LastName) < MinNameLen || len(req.LastName) > MaxNameLen {
+		return ErrInvalidLastName
+	}
+	if req.Nickname != nil && (len(*req.Nickname) < MinNicknameLen || len(*req.Nickname) > MaxNicknameLen) {
+		return ErrInvalidNickname
+	}
+	if req.AboutMe != nil && (len(*req.AboutMe) < MinAboutMeLen || len(*req.AboutMe) > MaxAboutMeLen) {
+		return ErrInvalidAboutMe
 	}
 	if err := ValidateAge(req.DateOfBirth); err != nil {
 		return err
