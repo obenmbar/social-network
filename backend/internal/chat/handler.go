@@ -1,0 +1,129 @@
+package chat
+
+import (
+	"encoding/json"
+	"log"
+	"net/http"
+
+	"social-network/internal/middleware"
+
+	"github.com/gorilla/websocket"
+)
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow all origins for testing
+	},
+}
+
+type Handler struct {
+	hub  *Hub
+	repo *Repository
+}
+
+func NewHandler(hub *Hub, repo *Repository) *Handler {
+	return &Handler{
+		hub:  hub,
+		repo: repo,
+	}
+}
+
+func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
+	// Extract userID from context using the shared key
+	val := r.Context().Value(middleware.UserIDKey)
+	userID, ok := val.(string)
+	if !ok || userID == "" {
+		log.Printf("🔴 WS Connection attempt failed: Unauthorized. No UserID found in context.")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("🔴 WS Upgrade failed: %v", err)
+		return
+	}
+
+	nickname, _ := h.repo.GetUserNickname(userID)
+
+	client := &Client{
+		Hub:      h.hub,
+		Conn:     conn,
+		Send:     make(chan []byte, 256),
+		UserID:   userID,
+		Nickname: nickname,
+	}
+
+	h.hub.Register <- client
+
+	go client.WritePump()
+	client.ReadPump()
+}
+
+func (h *Handler) GetHistory(w http.ResponseWriter, r *http.Request) {
+	currentUserID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || currentUserID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	otherUserID := r.URL.Query().Get("user_id")
+	if otherUserID == "" {
+		http.Error(w, "Missing user_id parameter", http.StatusBadRequest)
+		return
+	}
+
+	messages, err := h.repo.GetPrivateMessages(currentUserID, otherUserID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(messages)
+}
+
+func (h *Handler) GetGroupHistory(w http.ResponseWriter, r *http.Request) {
+	currentUserID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || currentUserID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	groupID := r.URL.Query().Get("group_id")
+	if groupID == "" {
+		http.Error(w, "Missing group_id parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Verify membership
+	memberIDs, err := h.repo.GetGroupMembers(groupID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	isMember := false
+	for _, id := range memberIDs {
+		if id == currentUserID {
+			isMember = true
+			break
+		}
+	}
+
+	if !isMember {
+		http.Error(w, "Forbidden: Not a group member", http.StatusForbidden)
+		return
+	}
+
+	messages, err := h.repo.GetGroupMessages(groupID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(messages)
+}

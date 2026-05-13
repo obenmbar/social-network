@@ -102,6 +102,21 @@ func (r *Repository) GetUserIDByNickname(nickname string) (string, error) {
 	return userID, nil
 }
 
+func (r *Repository) CreateFollowRequest(followerID, followedID string) error {
+	_, err := r.db.Exec(`INSERT OR IGNORE INTO follow_requests (follower_id, followed_id) VALUES (?, ?)`, followerID, followedID)
+	return err
+}
+
+func (r *Repository) DeleteFollowRequest(followerID, followedID string) error {
+	_, err := r.db.Exec(`DELETE FROM follow_requests WHERE follower_id = ? AND followed_id = ?`, followerID, followedID)
+	return err
+}
+
+func (r *Repository) CreateFollower(followerID, followedID string) error {
+	_, err := r.db.Exec(`INSERT OR IGNORE INTO followers (follower_id, followed_id) VALUES (?, ?)`, followerID, followedID)
+	return err
+}
+
 func (r *Repository) GetFollowers(userID string) ([]Author, error) {
 	rows, err := r.db.Query(`
 		SELECT u.id, u.first_name, u.last_name, u.nickname, u.avatar

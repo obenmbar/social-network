@@ -1,6 +1,13 @@
 import { removeSession } from "./session";
 
-const API_BASE = "/api/path";
+const getApiBase = () => {
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8080`;
+  }
+  return "http://localhost:8080";
+};
+
+const API_BASE = getApiBase();
 const MAX_IMAGE_SIZE = 10 << 20;
 
 async function fetchAPI(endpoint, method = "GET", body = null) {
@@ -41,8 +48,12 @@ async function fetchAPI(endpoint, method = "GET", body = null) {
 async function getErrorMessage(res) {
   const contentType = res.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
-    const data = await res.json();
-    return data.error || data.message;
+    try {
+      const data = await res.json();
+      return data.error || data.message;
+    } catch (e) {
+      return null;
+    }
   }
 
   return res.text();
@@ -62,6 +73,18 @@ export async function getCurrentUser() {
 
 export async function getFollowers() {
   return fetchAPI("/followers");
+}
+
+export async function followUser(userId) {
+  return fetchAPI(`/follow/${userId}`, "POST");
+}
+
+export async function acceptFollowRequest(userId) {
+  return fetchAPI(`/follow/${userId}/accept`, "POST");
+}
+
+export async function declineFollowRequest(userId) {
+  return fetchAPI(`/follow/${userId}/decline`, "POST");
 }
 
 export async function logout() {
@@ -172,6 +195,22 @@ export async function respondToGroupEvent(groupId, eventId, response) {
   });
 }
 
+export async function getNotifications() {
+  return fetchAPI("/notifications");
+}
+
+export async function getChatHistory(userId) {
+  return fetchAPI(`/chat/history?user_id=${userId}`);
+}
+
+export async function getGroupChatHistory(groupId) {
+  return fetchAPI(`/chat/group/history?group_id=${groupId}`);
+}
+
+export async function markNotificationRead(notificationId) {
+  return fetchAPI("/notifications/read", "POST", { id: notificationId });
+}
+
 export function mediaUrl(path) {
   if (!path) {
     return "";
@@ -190,7 +229,7 @@ export function mediaUrl(path) {
 }
 
 function apiUrl(endpoint) {
-  return `${API_BASE}?target=${encodeURIComponent(endpoint)}`;
+  return `${API_BASE}${endpoint}`;
 }
 
 export function isUnauthorized(err) {

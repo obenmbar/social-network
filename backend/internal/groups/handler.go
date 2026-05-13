@@ -278,6 +278,63 @@ func (h *Handler) RespondToEvent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "Event response saved"})
 }
 
+func (h *Handler) Follow(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodPost {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	targetID := r.PathValue("id")
+	if err := h.service.FollowUser(userID, targetID); err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": "Follow request sent"})
+}
+
+func (h *Handler) AcceptFollow(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodPost {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	followerID := r.PathValue("id")
+	if err := h.service.AcceptFollowRequest(followerID, userID); err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": "Follow request accepted"})
+}
+
+func (h *Handler) DeclineFollow(w http.ResponseWriter, r *http.Request) {
+	writeJSONHeader(w)
+	if r.Method != http.MethodPost {
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeJSONError(w, "Not logged in", http.StatusUnauthorized)
+		return
+	}
+	followerID := r.PathValue("id")
+	if err := h.service.DeclineFollowRequest(followerID, userID); err != nil {
+		writeGroupError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": "Follow request declined"})
+}
+
 func (h *Handler) Invitations(w http.ResponseWriter, r *http.Request) {
 	writeJSONHeader(w)
 	if r.Method != http.MethodGet {

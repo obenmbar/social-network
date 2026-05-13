@@ -116,14 +116,17 @@ export default function AppShell({ children }) {
     return children;
   }
 
-  if (!hasLocalSession || !user) {
-    return null;
+  // If session exists locally, render content immediately to avoid 'freeze' 
+  // until getCurrentUser resolves.
+  if (hasLocalSession) {
+    return (
+      <>
+        {user && <AuthNavbar user={user} />}
+        {children}
+      </>
+    );
   }
 
-  return (
-    <>
-      <AuthNavbar user={user} />
-      {children}
-    </>
-  );
+  // If no session, wait for useEffect to redirect
+  return null;
 }
