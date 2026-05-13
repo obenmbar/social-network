@@ -19,6 +19,7 @@ var (
 	ErrInvalidStatus = errors.New("invalid status")
 	ErrUserRequired  = errors.New("user is required")
 	ErrUserNotFound  = errors.New("user not found")
+	ErrNotFollower   = errors.New("can only invite your followers")
 )
 
 type Service struct {
@@ -43,7 +44,7 @@ func (s *Service) CreateGroup(userID string, req CreateGroupRequest) (*Group, er
 		Title:       req.Title,
 		Description: req.Description,
 	}
-	inviteeIDs, err := s.userIDsByNicknames(req.InviteeNicknames)
+	inviteeIDs, err := s.userIDsByNicknames(userID, req.InviteeNicknames)
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +112,9 @@ func (s *Service) InviteUser(userID, groupID string, req InviteRequest) error {
 	}
 	inviteeID, err := s.userIDByNickname(nickname)
 	if err != nil {
+		return err
+	}
+	if err := s.requireFollower(userID, inviteeID); err != nil {
 		return err
 	}
 	return s.repo.InviteUser(groupID, userID, inviteeID)
@@ -260,8 +264,6 @@ func (s *Service) CreateEvent(userID, groupID string, req CreateEventRequest) (*
 	return event, nil
 }
 
-
-
 func (s *Service) RespondToEvent(userID, groupID, eventID string, req EventResponseRequest) error {
 	switch req.Response {
 	case "going", "not_going":
@@ -296,7 +298,7 @@ func (s *Service) requireMember(groupID, userID string) error {
 	return nil
 }
 
-func (s *Service) userIDsByNicknames(nicknames []string) ([]string, error) {
+func (s *Service) userIDsByNicknames(inviterID string, nicknames []string) ([]string, error) {
 	nicknames = uniqueNicknames(nicknames)
 	userIDs := make([]string, 0, len(nicknames))
 	for _, nickname := range nicknames {
@@ -304,9 +306,23 @@ func (s *Service) userIDsByNicknames(nicknames []string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := s.requireFollower(inviterID, userID); err != nil {
+			return nil, err
+		}
 		userIDs = append(userIDs, userID)
 	}
 	return userIDs, nil
+}
+
+func (s *Service) requireFollower(userID, followerID string) error {
+	isFollower, err := s.repo.IsFollower(followerID, userID)
+	if err != nil {
+		return err
+	}
+	if !isFollower {
+		return ErrNotFollower
+	}
+	return nil
 }
 
 func (s *Service) userIDByNickname(nickname string) (string, error) {

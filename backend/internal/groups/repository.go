@@ -90,6 +90,14 @@ func (r *Repository) IsCreator(groupID, userID string) (bool, error) {
 	return exists, nil
 }
 
+func (r *Repository) IsFollower(followerID, followedID string) (bool, error) {
+	var exists bool
+	if err := r.db.QueryRow(`SELECT EXISTS (SELECT 1 FROM followers WHERE follower_id = ? AND followed_id = ?)`, followerID, followedID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("failed to check follower: %w", err)
+	}
+	return exists, nil
+}
+
 func (r *Repository) GetUserIDByNickname(nickname string) (string, error) {
 	var userID string
 	err := r.db.QueryRow(`SELECT id FROM users WHERE nickname = ?`, nickname).Scan(&userID)
