@@ -1,28 +1,50 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import {
+  followUser,
   getCurrentUser,
-  getFollowRequests,
-  getFollowing,
-  getFollowers,
+  getFeed,
+  getUserProfile,
   isUnauthorized,
   mediaUrl,
-  respondToFollowRequest,
+  unfollowUser,
   updateProfileVisibility,
 } from "@/lib/api";
 import styles from "./Profile.module.css";
 
 export default function ProfilePage() {
+  return (
+    <Suspense fallback={<ProfileLoading />}>
+      <ProfileRoute />
+    </Suspense>
+  );
+}
+
+function ProfileRoute() {
+  const searchParams = useSearchParams();
+  const requestedProfileId = searchParams.get("user_id") || "";
+
+  return (
+    <ProfileContent
+      key={requestedProfileId || "current-user"}
+      requestedProfileId={requestedProfileId}
+    />
+  );
+}
+
+function ProfileContent({ requestedProfileId }) {
   const router = useRouter();
   const [user, setUser] = useState(null);
-  const [followers, setFollowers] = useState([]);
-  const [following, setFollowing] = useState([]);
-  const [requests, setRequests] = useState([]);
+  const [profile, setProfile] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [activeList, setActiveList] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -36,6 +58,7 @@ export default function ProfilePage() {
           router.replace("/login");
         } else {
           setError(err.message || "Could not load profile");
+          setProfile(null);
         }
       })
       .finally(() => {
@@ -45,62 +68,49 @@ export default function ProfilePage() {
       });
 
     async function loadProfileData() {
-      const [currentUser, followerList, followingList, requestList] = await Promise.all([
-        getCurrentUser(),
-        getFollowers(),
-        getFollowing(),
-        getFollowRequests(),
-      ]);
+      const currentUser = await getCurrentUser();
+      const targetId = requestedProfileId || currentUser.id;
+      const profileData = await getUserProfile(targetId);
+      let profilePosts = [];
+
+      if (profileData.can_view_details) {
+        const feed = await getFeed();
+        profilePosts = (feed || []).filter(
+          (post) => post.user_id === profileData.id || post.author?.id === profileData.id
+        );
+      }
 
       if (!isMounted) {
         return;
       }
+
+      setError("");
+      setActiveList("");
       setUser(currentUser);
-      setFollowers(followerList || []);
-      setFollowing(followingList || []);
-      setRequests(requestList || []);
+      setProfile(profileData);
+      setPosts(profilePosts);
     }
 
     return () => {
       isMounted = false;
     };
-  }, [router]);
+  }, [requestedProfileId, reloadKey, router]);
 
-  const refreshFollowLists = async () => {
-    const [followerList, followingList, requestList] = await Promise.all([
-      getFollowers(),
-      getFollowing(),
-      getFollowRequests(),
-    ]);
-    setFollowers(followerList || []);
-    setFollowing(followingList || []);
-    setRequests(requestList || []);
-  };
-
-  const handleRequestResponse = async (requestId, status) => {
-    setBusyId(requestId);
-    setError("");
-    try {
-      await respondToFollowRequest(requestId, status);
-      await refreshFollowLists();
-    } catch (err) {
-      setError(err.message || "Could not update request");
-    } finally {
-      setBusyId("");
-    }
+  const refreshProfile = () => {
+    setReloadKey((current) => current + 1);
   };
 
   const handleVisibilityChange = async () => {
-    if (!user) {
+    if (!profile) {
       return;
     }
-    const nextVisibility = !user.is_public;
+    const nextVisibility = !profile.is_public;
     setBusyId("visibility");
     setError("");
     try {
       await updateProfileVisibility(nextVisibility);
-      setUser((current) => ({ ...current, is_public: nextVisibility }));
-      await refreshFollowLists();
+      setIsLoading(true);
+      refreshProfile();
     } catch (err) {
       setError(err.message || "Could not update profile visibility");
     } finally {
@@ -108,16 +118,73 @@ export default function ProfilePage() {
     }
   };
 
-  const avatarInitial = user?.first_name?.trim()?.charAt(0)?.toUpperCase() || "?";
+  const handleFollow = async () => {
+    if (!profile) {
+      return;
+    }
+    setBusyId("follow");
+    setError("");
+    try {
+      await followUser(profile.id);
+      setIsLoading(true);
+      refreshProfile();
+    } catch (err) {
+      setError(err.message || "Could not update follow status");
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  const handleUnfollow = async () => {
+    if (!profile) {
+      return;
+    }
+    setBusyId("follow");
+    setError("");
+    try {
+      await unfollowUser(profile.id);
+      setIsLoading(true);
+      refreshProfile();
+    } catch (err) {
+      setError(err.message || "Could not unfollow user");
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  const followers = profile?.followers || [];
+  const following = profile?.following || [];
+  const canViewDetails = Boolean(profile?.can_view_details);
+  const isOwnProfile = Boolean(user?.id && profile?.id && user.id === profile.id);
+  const avatarInitial = profile?.first_name?.trim()?.charAt(0)?.toUpperCase() || "?";
+  const visibleList = activeList === "following" ? following : followers;
+
+  if (isLoading && !profile) {
+    return <ProfileLoading />;
+  }
+
+  if (!profile) {
+    return (
+      <main className={styles.profilePage}>
+        {error && <p className={styles.errorMessage}>{error}</p>}
+        <div className={styles.profileGrid}>
+          <section className={styles.sectionPanel}>
+            <h2>Profile unavailable</h2>
+            <p className={styles.emptyState}>This profile could not be loaded.</p>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className={styles.profilePage}>
       <section className={styles.profilePanel}>
         <div className={styles.avatar}>
-          {user?.avatar ? (
+          {profile?.avatar ? (
             <span
               className={styles.avatarImage}
-              style={{ backgroundImage: `url(${mediaUrl(user.avatar)})` }}
+              style={{ backgroundImage: `url(${mediaUrl(profile.avatar)})` }}
             />
           ) : (
             <span className={styles.avatarInitial}>{avatarInitial}</span>
@@ -125,76 +192,184 @@ export default function ProfilePage() {
         </div>
 
         <div className={styles.profileInfo}>
-          <h1>{user ? `${user.first_name} ${user.last_name}` : "Profile"}</h1>
-          {user?.nickname && <p className={styles.nickname}>@{user.nickname}</p>}
-          {user?.about_me && <p className={styles.about}>{user.about_me}</p>}
+          <h1>{profile ? displayName(profile) : "Profile"}</h1>
+          {profile?.nickname && <p className={styles.nickname}>@{mentionHandle(profile)}</p>}
+          {profile?.about_me && <p className={styles.about}>{profile.about_me}</p>}
           <div className={styles.metaRow}>
-            <span>{followers.length} followers</span>
-            <span>{following.length} following</span>
-            <span>{user?.is_public ? "Public profile" : "Private profile"}</span>
+            {canViewDetails ? (
+              <>
+                <button
+                  type="button"
+                  className={`${styles.metaButton} ${
+                    activeList === "followers" ? styles.activeMetaButton : ""
+                  }`}
+                  onClick={() =>
+                    setActiveList((current) =>
+                      current === "followers" ? "" : "followers"
+                    )
+                  }
+                >
+                  {followers.length} followers
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.metaButton} ${
+                    activeList === "following" ? styles.activeMetaButton : ""
+                  }`}
+                  onClick={() =>
+                    setActiveList((current) =>
+                      current === "following" ? "" : "following"
+                    )
+                  }
+                >
+                  {following.length} following
+                </button>
+              </>
+            ) : (
+              <>
+                <span>Followers hidden</span>
+                <span>Following hidden</span>
+              </>
+            )}
+            <span>{profile?.is_public ? "Public profile" : "Private profile"}</span>
           </div>
         </div>
 
-        <button
-          type="button"
-          className={styles.secondaryButton}
-          onClick={handleVisibilityChange}
-          disabled={busyId === "visibility"}
-        >
-          {user?.is_public ? "Make Private" : "Make Public"}
-        </button>
+        {isOwnProfile ? (
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={handleVisibilityChange}
+            disabled={busyId === "visibility"}
+          >
+            {profile?.is_public ? "Make Private" : "Make Public"}
+          </button>
+        ) : (
+          <ProfileFollowButton
+            profile={profile}
+            busy={busyId === "follow"}
+            onFollow={handleFollow}
+            onUnfollow={handleUnfollow}
+          />
+        )}
       </section>
 
       {error && <p className={styles.errorMessage}>{error}</p>}
 
       <div className={styles.profileGrid}>
-        <section className={styles.sectionPanel}>
-          <h2>Follow Requests</h2>
-          {isLoading ? (
-            <p className={styles.emptyState}>Loading requests...</p>
-          ) : requests.length === 0 ? (
-            <p className={styles.emptyState}>No pending follow requests.</p>
-          ) : (
-            <div className={styles.userList}>
-              {requests.map((request) => (
-                <UserRow key={request.id} user={request.requester}>
-                  <button
-                    type="button"
-                    className={styles.primaryButton}
-                    onClick={() => handleRequestResponse(request.id, "accepted")}
-                    disabled={busyId === request.id}
-                  >
-                    Accept
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => handleRequestResponse(request.id, "declined")}
-                    disabled={busyId === request.id}
-                  >
-                    Decline
-                  </button>
-                </UserRow>
-              ))}
-            </div>
-          )}
-        </section>
+        {!canViewDetails ? (
+          <section className={styles.sectionPanel}>
+            <h2>Private profile</h2>
+            <p className={styles.emptyState}>
+              Follow this user to see posts, followers, and following.
+            </p>
+          </section>
+        ) : (
+          <>
+            {activeList && (
+              <section className={styles.sectionPanel}>
+                <h2>{activeList === "following" ? "Following" : "Followers"}</h2>
+                {visibleList.length === 0 ? (
+                  <p className={styles.emptyState}>
+                    No {activeList === "following" ? "following" : "followers"} yet.
+                  </p>
+                ) : (
+                  <div className={styles.userList}>
+                    {visibleList.map((person) => (
+                      <UserRow key={person.id} user={person} />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
 
+            <section className={styles.sectionPanel}>
+              <h2>Posts</h2>
+              {posts.length === 0 ? (
+                <p className={styles.emptyState}>No visible posts yet.</p>
+              ) : (
+                <div className={styles.postList}>
+                  {posts.map((post) => (
+                    <article key={post.id} className={styles.postCard}>
+                      <header className={styles.postHeader}>
+                        <MiniAvatar user={post.author} />
+                        <div>
+                          <strong>{displayName(post.author)}</strong>
+                          <span>
+                            {formatDate(post.created_at)} · {privacyLabel(post.privacy)}
+                          </span>
+                        </div>
+                      </header>
+                      {post.title && <h3 className={styles.postTitle}>{post.title}</h3>}
+                      {post.content && <p className={styles.postContent}>{post.content}</p>}
+                      {post.image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className={styles.postImage} src={mediaUrl(post.image)} alt="" />
+                      )}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </main>
   );
 }
 
-function UserRow({ user, children }) {
+function ProfileLoading() {
   return (
-    <div className={styles.userRow}>
+    <main className={styles.profilePage}>
+      <section className={styles.sectionPanel}>
+        <p className={styles.emptyState}>Loading profile...</p>
+      </section>
+    </main>
+  );
+}
+
+function ProfileFollowButton({ profile, busy, onFollow, onUnfollow }) {
+  if (!profile) {
+    return null;
+  }
+
+  if (profile.follow_status === "following") {
+    return (
+      <button
+        type="button"
+        className={styles.secondaryButton}
+        onClick={onUnfollow}
+        disabled={busy}
+      >
+        Unfollow
+      </button>
+    );
+  }
+
+  if (profile.follow_status === "pending") {
+    return (
+      <button type="button" className={styles.secondaryButton} disabled>
+        Requested
+      </button>
+    );
+  }
+
+  return (
+    <button type="button" className={styles.primaryButton} onClick={onFollow} disabled={busy}>
+      Follow
+    </button>
+  );
+}
+
+function UserRow({ user }) {
+  return (
+    <Link href={`/profile?user_id=${user.id}`} className={styles.userRow}>
       <MiniAvatar user={user} />
       <div className={styles.userText}>
         <strong>{displayName(user)}</strong>
         <span>@{mentionHandle(user)}</span>
       </div>
-      {children && <div className={styles.rowActions}>{children}</div>}
-    </div>
+    </Link>
   );
 }
 
@@ -220,4 +395,25 @@ function displayName(user) {
 
 function mentionHandle(user) {
   return user?.nickname || displayName(user).toLowerCase().replace(/\s+/g, ".") || "user";
+}
+
+function privacyLabel(privacy) {
+  if (privacy === "followers") {
+    return "Followers";
+  }
+  if (privacy === "private_selected") {
+    return "Selected";
+  }
+  return "Public";
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }

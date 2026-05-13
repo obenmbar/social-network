@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -8,11 +9,13 @@ import {
   followUser,
   getCurrentUser,
   getFeed,
+  getFollowRequests,
   getFollowers,
   getPost,
   getUsers,
   isUnauthorized,
   mediaUrl,
+  respondToFollowRequest,
   unfollowUser,
 } from "@/lib/api";
 import styles from "./Feed.module.css";
@@ -30,10 +33,12 @@ export default function Feed() {
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
   const [followers, setFollowers] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [users, setUsers] = useState([]);
   const [peopleQuery, setPeopleQuery] = useState("");
   const [peoplePage, setPeoplePage] = useState(1);
   const [busyFollowId, setBusyFollowId] = useState("");
+  const [busyRequestId, setBusyRequestId] = useState("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [privacy, setPrivacy] = useState("public");
@@ -51,13 +56,14 @@ export default function Feed() {
   useEffect(() => {
     let isMounted = true;
 
-    Promise.all([getCurrentUser(), getFeed(), getFollowers(), getUsers()])
-      .then(([currentUser, feed, followerList, userList]) => {
+    Promise.all([getCurrentUser(), getFeed(), getFollowers(), getUsers(), getFollowRequests()])
+      .then(([currentUser, feed, followerList, userList, requestList]) => {
         if (isMounted) {
           setUser(currentUser);
           setPosts(feed);
           setFollowers(followerList || []);
           setUsers(userList || []);
+          setRequests(requestList || []);
         }
       })
       .catch((err) => {
@@ -233,6 +239,15 @@ export default function Feed() {
     setPosts(feed || []);
   };
 
+  const refreshRequestData = async () => {
+    const [requestList, followerList] = await Promise.all([
+      getFollowRequests(),
+      getFollowers(),
+    ]);
+    setRequests(requestList || []);
+    setFollowers(followerList || []);
+  };
+
   const handleFollow = async (targetId) => {
     setBusyFollowId(targetId);
     setError("");
@@ -256,6 +271,19 @@ export default function Feed() {
       setError(err.message || "Could not unfollow user");
     } finally {
       setBusyFollowId("");
+    }
+  };
+
+  const handleRequestResponse = async (requestId, status) => {
+    setBusyRequestId(requestId);
+    setError("");
+    try {
+      await respondToFollowRequest(requestId, status);
+      await refreshRequestData();
+    } catch (err) {
+      setError(err.message || "Could not update request");
+    } finally {
+      setBusyRequestId("");
     }
   };
 
@@ -395,7 +423,11 @@ export default function Feed() {
                 <header className={styles.postHeader}>
                   <Avatar user={post.author} />
                   <div>
-                    <h3>{displayName(post.author)}</h3>
+                    <h3>
+                      <Link href={`/profile?user_id=${post.author.id}`}>
+                        {displayName(post.author)}
+                      </Link>
+                    </h3>
                     <p>
                       {formatDate(post.created_at)} · {privacyLabel(post.privacy)}
                     </p>
@@ -474,6 +506,54 @@ export default function Feed() {
           </section>
         </main>
         <aside className={styles.peoplePanel} aria-label="People">
+          <section className={styles.requestsSection} aria-label="Follow requests">
+            <div className={styles.peopleHeader}>
+              <h2>Follow Requests</h2>
+              <span>{requests.length}</span>
+            </div>
+
+            {isLoading ? (
+              <p className={styles.peopleEmpty}>Loading requests...</p>
+            ) : requests.length === 0 ? (
+              <p className={styles.peopleEmpty}>No pending requests.</p>
+            ) : (
+              <div className={styles.requestList}>
+                {requests.map((request) => (
+                  <div key={request.id} className={styles.requestRow}>
+                    <Link
+                      href={`/profile?user_id=${request.requester.id}`}
+                      className={styles.requestProfileLink}
+                    >
+                      <Avatar user={request.requester} size="small" />
+                      <span>
+                        <strong>{displayName(request.requester)}</strong>
+                        <small>@{mentionHandle(request.requester)}</small>
+                      </span>
+                    </Link>
+                    <div className={styles.requestActions}>
+                      <button
+                        type="button"
+                        className={styles.peoplePrimaryButton}
+                        onClick={() => handleRequestResponse(request.id, "accepted")}
+                        disabled={busyRequestId === request.id}
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.peopleSecondaryButton}
+                        onClick={() => handleRequestResponse(request.id, "declined")}
+                        disabled={busyRequestId === request.id}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
           <div className={styles.peopleHeader}>
             <h2>People</h2>
             <span>{filteredPeople.length}</span>
@@ -541,11 +621,13 @@ export default function Feed() {
 function PeopleRow({ user, busy, onFollow, onUnfollow }) {
   return (
     <div className={styles.peopleRow}>
-      <Avatar user={user} size="small" />
-      <div className={styles.peopleText}>
-        <strong>{displayName(user)}</strong>
-        <span>@{mentionHandle(user)}</span>
-      </div>
+      <Link href={`/profile?user_id=${user.id}`} className={styles.peopleProfileLink}>
+        <Avatar user={user} size="small" />
+        <div className={styles.peopleText}>
+          <strong>{displayName(user)}</strong>
+          <span>@{mentionHandle(user)}</span>
+        </div>
+      </Link>
       <FollowButton
         user={user}
         busy={busy}

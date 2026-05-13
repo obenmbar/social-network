@@ -13,6 +13,7 @@ var (
 	ErrCannotFollow    = errors.New("cannot follow yourself")
 	ErrRequestNotFound = errors.New("follow request not found")
 	ErrInvalidStatus   = errors.New("invalid status")
+	ErrPrivateProfile  = errors.New("private profile")
 )
 
 type Service struct {
@@ -110,19 +111,40 @@ func (s *Service) RespondToRequest(userID, requestID, status string) error {
 }
 
 func (s *Service) ListFollowers(viewerID, userID string) ([]UserSummary, error) {
-	if strings.TrimSpace(userID) == "" {
-		userID = viewerID
+	targetID, err := s.visibleFollowListTarget(viewerID, userID)
+	if err != nil {
+		return nil, err
 	}
-	return s.repo.ListFollowers(viewerID, userID)
+	return s.repo.ListFollowers(viewerID, targetID)
 }
 
 func (s *Service) ListFollowing(viewerID, userID string) ([]UserSummary, error) {
-	if strings.TrimSpace(userID) == "" {
-		userID = viewerID
+	targetID, err := s.visibleFollowListTarget(viewerID, userID)
+	if err != nil {
+		return nil, err
 	}
-	return s.repo.ListFollowing(viewerID, userID)
+	return s.repo.ListFollowing(viewerID, targetID)
 }
 
 func (s *Service) UpdateVisibility(userID string, isPublic bool) error {
 	return s.repo.UpdateVisibility(userID, isPublic)
+}
+
+func (s *Service) visibleFollowListTarget(viewerID, userID string) (string, error) {
+	targetID := strings.TrimSpace(userID)
+	if targetID == "" {
+		targetID = viewerID
+	}
+
+	exists, canView, err := s.repo.CanViewProfileDetails(viewerID, targetID)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", ErrUserNotFound
+	}
+	if !canView {
+		return "", ErrPrivateProfile
+	}
+	return targetID, nil
 }

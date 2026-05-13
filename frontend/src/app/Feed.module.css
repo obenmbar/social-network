@@ -301,6 +301,14 @@
   padding: 1rem;
 }
 
+.requestsSection {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
 .peopleHeader {
   display: flex;
   align-items: center;
@@ -350,13 +358,77 @@
 
 .peopleRow {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.65rem;
   padding: 0.6rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--background);
+}
+
+.peopleProfileLink,
+.requestProfileLink {
+  min-width: 0;
+  color: inherit;
+}
+
+.peopleProfileLink {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.requestList {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.requestRow {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+}
+
+.requestProfileLink {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.requestProfileLink span {
+  min-width: 0;
+}
+
+.requestProfileLink strong,
+.requestProfileLink small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requestProfileLink strong {
+  font-size: 0.9rem;
+}
+
+.requestProfileLink small {
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+}
+
+.requestActions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.requestActions button {
+  flex: 1;
 }
 
 .peopleText {

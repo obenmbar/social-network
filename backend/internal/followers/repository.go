@@ -111,6 +111,27 @@ func (r *Repository) IsFollowing(followerID, followedID string) (bool, error) {
 	return exists, nil
 }
 
+func (r *Repository) CanViewProfileDetails(viewerID, profileID string) (bool, bool, error) {
+	var isSelf bool
+	var isPublic bool
+	var isFollowing bool
+	err := r.db.QueryRow(`
+		SELECT u.id = ?, u.is_public,
+		       EXISTS (
+		       	SELECT 1 FROM followers f
+		       	WHERE f.follower_id = ? AND f.followed_id = u.id
+		       )
+		FROM users u
+		WHERE u.id = ?`, viewerID, viewerID, profileID).Scan(&isSelf, &isPublic, &isFollowing)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, false, nil
+		}
+		return false, false, fmt.Errorf("failed to check profile visibility: %w", err)
+	}
+	return true, isSelf || isPublic || isFollowing, nil
+}
+
 func (r *Repository) Follow(followerID, followedID string) error {
 	tx, err := r.db.Begin()
 	if err != nil {

@@ -147,6 +147,18 @@ export default function GroupsPage() {
     setDrafts((current) => ({ ...current, [key]: value }));
   }
 
+  function focusInviteField(field, key) {
+    setActiveInviteField(field);
+    setDrafts((current) => {
+      const value = current[key];
+      if (hasActiveMention(value, field === "create")) {
+        return current;
+      }
+
+      return { ...current, [key]: appendMentionTrigger(value, field === "create") };
+    });
+  }
+
   function selectCreateInvite(nickname) {
     updateDraft("invitees", replaceMentionToken(drafts.invitees, nickname, true));
     setActiveInviteField("create");
@@ -367,10 +379,10 @@ export default function GroupsPage() {
             <div className={styles.suggestField}>
               <input
                 value={drafts.invitees}
-                onFocus={() => setActiveInviteField("create")}
+                onFocus={() => focusInviteField("create", "invitees")}
                 onBlur={() => setTimeout(() => setActiveInviteField(""), 120)}
                 onChange={(event) => updateDraft("invitees", event.target.value)}
-                placeholder="Invite nicknames, comma separated"
+                placeholder="@nickname, @nickname"
               />
               {activeInviteField === "create" && createInviteSuggestions.length > 0 && (
                 <InviteSuggestions
@@ -565,10 +577,10 @@ export default function GroupsPage() {
                       <div className={styles.suggestField}>
                         <input
                           value={drafts.inviteUser}
-                          onFocus={() => setActiveInviteField("member")}
+                          onFocus={() => focusInviteField("member", "inviteUser")}
                           onBlur={() => setTimeout(() => setActiveInviteField(""), 120)}
                           onChange={(event) => updateDraft("inviteUser", event.target.value)}
-                          placeholder="Nickname"
+                          placeholder="@nickname"
                         />
                         {activeInviteField === "member" &&
                           memberInviteSuggestions.length > 0 && (
@@ -624,7 +636,7 @@ function InviteSuggestions({ users, onSelect }) {
   return (
     <div className={styles.suggestions} role="listbox">
       {users.map((user) => {
-        const nickname = user.nickname || "";
+        const nickname = mentionHandle(user);
         return (
           <button
             key={user.id}
@@ -660,15 +672,39 @@ function getMentionSuggestions(value, followers, allowCommaList) {
   const mention = getActiveMention(value, allowCommaList);
   if (!mention) return [];
   const query = mention.slice(1).toLowerCase();
-  return followers.filter((user) => {
-    const nickname = user.nickname || "";
-    return nickname.toLowerCase().startsWith(query);
-  });
+  return followers
+    .filter((user) => Boolean(mentionHandle(user)))
+    .filter((user) => {
+      if (!query) {
+        return true;
+      }
+
+      return (
+        mentionHandle(user).toLowerCase().startsWith(query) ||
+        displayName(user).toLowerCase().includes(query)
+      );
+    });
 }
 
 function getActiveMention(value, allowCommaList) {
   const token = allowCommaList ? value.split(",").at(-1).trimStart() : value.trimStart();
   return token.startsWith("@") ? token : "";
+}
+
+function hasActiveMention(value, allowCommaList) {
+  return Boolean(getActiveMention(value, allowCommaList));
+}
+
+function appendMentionTrigger(value, allowCommaList) {
+  if (!allowCommaList) {
+    return value.trim() ? value : "@";
+  }
+
+  if (!value.trim()) {
+    return "@";
+  }
+
+  return value.trimEnd().endsWith(",") ? `${value.trimEnd()} @` : `${value}, @`;
 }
 
 function replaceMentionToken(value, nickname, allowCommaList) {
@@ -686,6 +722,10 @@ function displayName(user) {
     user.nickname ||
     "Unknown user"
   );
+}
+
+function mentionHandle(user) {
+  return user?.nickname?.trim()?.replace(/^@+/, "") || "";
 }
 
 function Avatar({ user, size = "default" }) {

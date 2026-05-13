@@ -194,6 +194,8 @@ func writeFollowError(w http.ResponseWriter, err error) {
 		writeJSONError(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, ErrUserNotFound), errors.Is(err, ErrRequestNotFound):
 		writeJSONError(w, err.Error(), http.StatusNotFound)
+	case errors.Is(err, ErrPrivateProfile):
+		writeJSONError(w, err.Error(), http.StatusForbidden)
 	default:
 		writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 	}

@@ -60,8 +60,9 @@ export async function getCurrentUser() {
   return fetchAPI("/me");
 }
 
-export async function getFollowers() {
-  return fetchAPI("/followers");
+export async function getFollowers(userId) {
+  const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+  return fetchAPI(`/followers${query}`);
 }
 
 export async function getFollowing(userId) {
