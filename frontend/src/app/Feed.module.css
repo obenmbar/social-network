@@ -4,17 +4,27 @@
   color: var(--foreground);
 }
 
-.mainContent {
-  max-width: 680px;
+.feedLayout {
+  max-width: 1120px;
   width: 100%;
   margin: 0 auto;
   padding: 1.5rem 1rem 3rem;
+  display: grid;
+  grid-template-columns: minmax(0, 680px) minmax(280px, 320px);
+  gap: 1rem;
+  align-items: start;
+}
+
+.mainContent {
+  width: 100%;
+  min-width: 0;
 }
 
 .welcomeSection,
 .composer,
 .postCard,
-.emptyState {
+.emptyState,
+.peoplePanel {
   background-color: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -285,6 +295,151 @@
   gap: 1rem;
 }
 
+.peoplePanel {
+  position: sticky;
+  top: 1rem;
+  padding: 1rem;
+}
+
+.peopleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.peopleHeader h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.peopleHeader span {
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 999px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.peopleSearch {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+  padding: 0 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.peopleSearch::placeholder {
+  color: var(--muted-foreground);
+}
+
+.peopleList {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.peopleRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+}
+
+.peopleText {
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.peopleText strong,
+.peopleText span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peopleText strong {
+  font-size: 0.9rem;
+}
+
+.peopleText span,
+.peopleEmpty {
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+}
+
+.peopleEmpty {
+  margin: 0;
+}
+
+.peoplePrimaryButton,
+.peopleSecondaryButton,
+.peoplePagination button {
+  min-height: 32px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.peoplePrimaryButton,
+.peopleSecondaryButton {
+  padding: 0 0.65rem;
+}
+
+.peoplePrimaryButton {
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.peopleSecondaryButton {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.peoplePrimaryButton:disabled,
+.peopleSecondaryButton:disabled,
+.peoplePagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.peoplePagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+}
+
+.peoplePagination button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 0 0.65rem;
+}
+
 .postCard {
   padding: 1rem;
 }
@@ -525,7 +680,7 @@
 }
 
 @media (max-width: 560px) {
-  .mainContent {
+  .feedLayout {
     padding-inline: 0.75rem;
   }
 
@@ -550,5 +705,16 @@
 
   .commentForm {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .feedLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .peoplePanel {
+    position: static;
+    order: -1;
   }
 }

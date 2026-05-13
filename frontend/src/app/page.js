@@ -5,12 +5,15 @@ import { useEffect, useMemo, useState } from "react";
 import {
   createComment,
   createPost,
+  followUser,
   getCurrentUser,
   getFeed,
   getFollowers,
   getPost,
+  getUsers,
   isUnauthorized,
   mediaUrl,
+  unfollowUser,
 } from "@/lib/api";
 import styles from "./Feed.module.css";
 
@@ -20,11 +23,17 @@ const privacyOptions = [
   { value: "private_selected", label: "Selected" },
 ];
 
+const peoplePageSize = 6;
+
 export default function Feed() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
   const [followers, setFollowers] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [peopleQuery, setPeopleQuery] = useState("");
+  const [peoplePage, setPeoplePage] = useState(1);
+  const [busyFollowId, setBusyFollowId] = useState("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [privacy, setPrivacy] = useState("public");
@@ -42,12 +51,13 @@ export default function Feed() {
   useEffect(() => {
     let isMounted = true;
 
-    Promise.all([getCurrentUser(), getFeed(), getFollowers()])
-      .then(([currentUser, feed, followerList]) => {
+    Promise.all([getCurrentUser(), getFeed(), getFollowers(), getUsers()])
+      .then(([currentUser, feed, followerList, userList]) => {
         if (isMounted) {
           setUser(currentUser);
           setPosts(feed);
           setFollowers(followerList || []);
+          setUsers(userList || []);
         }
       })
       .catch((err) => {
@@ -73,6 +83,28 @@ export default function Feed() {
   const allowedUserIds = useMemo(() => {
     return privacy === "private_selected" ? selectedFollowerIds : [];
   }, [privacy, selectedFollowerIds]);
+
+  const filteredPeople = useMemo(() => {
+    const query = peopleQuery.trim().toLowerCase();
+    return users
+      .filter((item) => item.id !== user?.id)
+      .filter((item) => {
+        if (!query) {
+          return true;
+        }
+        return (
+          displayName(item).toLowerCase().includes(query) ||
+          mentionHandle(item).toLowerCase().includes(query)
+        );
+      });
+  }, [peopleQuery, user?.id, users]);
+
+  const peoplePageCount = Math.max(1, Math.ceil(filteredPeople.length / peoplePageSize));
+  const currentPeoplePage = Math.min(peoplePage, peoplePageCount);
+  const paginatedPeople = useMemo(() => {
+    const start = (currentPeoplePage - 1) * peoplePageSize;
+    return filteredPeople.slice(start, start + peoplePageSize);
+  }, [currentPeoplePage, filteredPeople]);
 
   const selectedFollowers = useMemo(() => {
     const selected = new Set(selectedFollowerIds);
@@ -190,24 +222,62 @@ export default function Feed() {
     }
   };
 
+  const handlePeopleSearch = (event) => {
+    setPeopleQuery(event.target.value);
+    setPeoplePage(1);
+  };
+
+  const refreshPeopleData = async () => {
+    const [userList, feed] = await Promise.all([getUsers(), getFeed()]);
+    setUsers(userList || []);
+    setPosts(feed || []);
+  };
+
+  const handleFollow = async (targetId) => {
+    setBusyFollowId(targetId);
+    setError("");
+    try {
+      await followUser(targetId);
+      await refreshPeopleData();
+    } catch (err) {
+      setError(err.message || "Could not update follow status");
+    } finally {
+      setBusyFollowId("");
+    }
+  };
+
+  const handleUnfollow = async (targetId) => {
+    setBusyFollowId(targetId);
+    setError("");
+    try {
+      await unfollowUser(targetId);
+      await refreshPeopleData();
+    } catch (err) {
+      setError(err.message || "Could not unfollow user");
+    } finally {
+      setBusyFollowId("");
+    }
+  };
+
   return (
     <div className={styles.feedContainer}>
-      <main className={styles.mainContent}>
-        <section className={styles.welcomeSection}>
-          <div>
-            <h2>Welcome{user?.first_name ? `, ${user.first_name}` : ""}</h2>
-            <p>Share an update or catch up with posts you can see.</p>
-          </div>
-        </section>
+      <div className={styles.feedLayout}>
+        <main className={styles.mainContent}>
+          <section className={styles.welcomeSection}>
+            <div>
+              <h2>Welcome{user?.first_name ? `, ${user.first_name}` : ""}</h2>
+              <p>Share an update or catch up with posts you can see.</p>
+            </div>
+          </section>
 
-        <form className={styles.composer} onSubmit={handleCreatePost}>
-          <div className={styles.composerHeader}>
-            <Avatar user={user} />
-            <div className={styles.composerFields}>
-              <label className={styles.srOnly} htmlFor="post-title">
-                Post title
-              </label>
-              <input
+          <form className={styles.composer} onSubmit={handleCreatePost}>
+            <div className={styles.composerHeader}>
+              <Avatar user={user} />
+              <div className={styles.composerFields}>
+                <label className={styles.srOnly} htmlFor="post-title">
+                  Post title
+                </label>
+                <input
                 id="post-title"
                 type="text"
                 value={title}
@@ -401,9 +471,122 @@ export default function Feed() {
               </article>
             ))
           )}
-        </section>
-      </main>
+          </section>
+        </main>
+        <aside className={styles.peoplePanel} aria-label="People">
+          <div className={styles.peopleHeader}>
+            <h2>People</h2>
+            <span>{filteredPeople.length}</span>
+          </div>
+
+          <label className={styles.srOnly} htmlFor="people-search">
+            Search people
+          </label>
+          <input
+            id="people-search"
+            className={styles.peopleSearch}
+            type="search"
+            value={peopleQuery}
+            onChange={handlePeopleSearch}
+            placeholder="Search people"
+          />
+
+          {isLoading ? (
+            <p className={styles.peopleEmpty}>Loading people...</p>
+          ) : paginatedPeople.length === 0 ? (
+            <p className={styles.peopleEmpty}>No matching users.</p>
+          ) : (
+            <div className={styles.peopleList}>
+              {paginatedPeople.map((person) => (
+                <PeopleRow
+                  key={person.id}
+                  user={person}
+                  busy={busyFollowId === person.id}
+                  onFollow={handleFollow}
+                  onUnfollow={handleUnfollow}
+                />
+              ))}
+            </div>
+          )}
+
+          {filteredPeople.length > peoplePageSize && (
+            <div className={styles.peoplePagination}>
+              <button
+                type="button"
+                onClick={() => setPeoplePage((page) => Math.max(1, page - 1))}
+                disabled={currentPeoplePage === 1}
+              >
+                Prev
+              </button>
+              <span>
+                {currentPeoplePage} / {peoplePageCount}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setPeoplePage((page) => Math.min(peoplePageCount, page + 1))
+                }
+                disabled={currentPeoplePage === peoplePageCount}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </aside>
+      </div>
     </div>
+  );
+}
+
+function PeopleRow({ user, busy, onFollow, onUnfollow }) {
+  return (
+    <div className={styles.peopleRow}>
+      <Avatar user={user} size="small" />
+      <div className={styles.peopleText}>
+        <strong>{displayName(user)}</strong>
+        <span>@{mentionHandle(user)}</span>
+      </div>
+      <FollowButton
+        user={user}
+        busy={busy}
+        onFollow={onFollow}
+        onUnfollow={onUnfollow}
+      />
+    </div>
+  );
+}
+
+function FollowButton({ user, busy, onFollow, onUnfollow }) {
+  if (user.follow_status === "following") {
+    return (
+      <button
+        type="button"
+        className={styles.peopleSecondaryButton}
+        onClick={() => onUnfollow(user.id)}
+        disabled={busy}
+      >
+        Unfollow
+      </button>
+    );
+  }
+
+  if (user.follow_status === "pending") {
+    return (
+      <button type="button" className={styles.peopleSecondaryButton} disabled>
+        Requested
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={styles.peoplePrimaryButton}
+      onClick={() => onFollow(user.id)}
+      disabled={busy}
+    >
+      Follow
+    </button>
   );
 }
 

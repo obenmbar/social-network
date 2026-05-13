@@ -64,6 +64,39 @@ export async function getFollowers() {
   return fetchAPI("/followers");
 }
 
+export async function getFollowing(userId) {
+  const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+  return fetchAPI(`/following${query}`);
+}
+
+export async function getUsers() {
+  return fetchAPI("/users");
+}
+
+export async function getUserProfile(userId) {
+  return fetchAPI(`/users/${userId}`);
+}
+
+export async function followUser(userId) {
+  return fetchAPI(`/users/${userId}/follow`, "POST");
+}
+
+export async function unfollowUser(userId) {
+  return fetchAPI(`/users/${userId}/follow`, "DELETE");
+}
+
+export async function getFollowRequests() {
+  return fetchAPI("/follow-requests");
+}
+
+export async function respondToFollowRequest(requestId, status) {
+  return fetchAPI(`/follow-requests/${requestId}/${status}`, "POST");
+}
+
+export async function updateProfileVisibility(isPublic) {
+  return fetchAPI("/me/profile-visibility", "PATCH", { is_public: isPublic });
+}
+
 export async function logout() {
   return fetchAPI("/logout", "POST");
 }

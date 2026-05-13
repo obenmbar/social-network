@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"social-network/internal/auth"
+	"social-network/internal/followers"
 	"social-network/internal/groups"
 	"social-network/internal/middleware"
 	"social-network/internal/posts"
@@ -51,6 +52,9 @@ func main() {
 	groupsRepo := groups.NewRepository(db)
 	groupsService := groups.NewService(groupsRepo)
 	groupsHandler := groups.NewHandler(groupsService)
+	followersRepo := followers.NewRepository(db)
+	followersService := followers.NewService(followersRepo)
+	followersHandler := followers.NewHandler(followersService)
 
 	// Middlewares
 	rateLimitRequests := getEnvInt("RATE_LIMIT_REQUESTS", 20)
@@ -67,8 +71,15 @@ func main() {
 
 	// Protected routes
 	mux.Handle("/me", sessionAuth(http.HandlerFunc(authHandler.Me)))
+	mux.Handle("/me/profile-visibility", sessionAuth(http.HandlerFunc(followersHandler.UpdateVisibility)))
 	mux.Handle("/logout", sessionAuth(http.HandlerFunc(authHandler.Logout)))
-	mux.Handle("/followers", sessionAuth(http.HandlerFunc(groupsHandler.Followers)))
+	mux.Handle("/users", sessionAuth(http.HandlerFunc(followersHandler.Users)))
+	mux.Handle("/users/{id}", sessionAuth(http.HandlerFunc(followersHandler.Profile)))
+	mux.Handle("/users/{id}/follow", sessionAuth(http.HandlerFunc(followersHandler.Follow)))
+	mux.Handle("/followers", sessionAuth(http.HandlerFunc(followersHandler.Followers)))
+	mux.Handle("/following", sessionAuth(http.HandlerFunc(followersHandler.Following)))
+	mux.Handle("/follow-requests", sessionAuth(http.HandlerFunc(followersHandler.Requests)))
+	mux.Handle("/follow-requests/{id}/{status}", sessionAuth(http.HandlerFunc(followersHandler.RespondToRequest)))
 	mux.Handle("/posts", sessionAuth(http.HandlerFunc(postsHandler.CreatePost)))
 	mux.Handle("/posts/feed", sessionAuth(http.HandlerFunc(postsHandler.Feed)))
 	mux.Handle("/posts/{id}", sessionAuth(http.HandlerFunc(postsHandler.GetPost)))

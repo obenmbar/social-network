@@ -2,34 +2,25 @@
   min-height: 100vh;
   background: var(--background);
   color: var(--foreground);
-}
-
-.navbar {
-  padding: 0.75rem 1.5rem;
-  background-color: var(--surface);
-  border-bottom: 1px solid var(--border);
-}
-
-.backLink {
-  font-size: 1.5rem;
-  font-weight: 700;
+  padding: 1.5rem;
 }
 
 .profilePanel {
-  width: min(680px, calc(100% - 2rem));
-  margin: 2rem auto;
-  padding: 1.5rem;
+  width: min(1040px, 100%);
+  margin: 0 auto 1.25rem;
+  padding: 1.25rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   gap: 1rem;
   align-items: center;
 }
 
 .avatar {
-  width: 72px;
-  height: 72px;
+  width: 76px;
+  height: 76px;
   border-radius: 50%;
   background: var(--background);
   border: 1px solid var(--border);
@@ -53,7 +44,11 @@
   font-weight: 700;
 }
 
-.profilePanel h1 {
+.profileInfo {
+  min-width: 0;
+}
+
+.profileInfo h1 {
   margin: 0;
   font-size: 1.5rem;
   word-break: break-word;
@@ -66,4 +61,157 @@
   color: var(--muted-foreground);
   word-break: break-word;
   overflow-wrap: break-word;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
+  color: var(--muted-foreground);
+  font-size: 0.9rem;
+}
+
+.profileGrid {
+  width: min(1040px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.sectionPanel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  min-width: 0;
+}
+
+.sectionPanel h2 {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+}
+
+.userList {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.userRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+}
+
+.miniAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-weight: 700;
+}
+
+.userText {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.userText strong,
+.userText span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userText span,
+.emptyState {
+  color: var(--muted-foreground);
+  font-size: 0.9rem;
+}
+
+.emptyState {
+  margin: 0;
+}
+
+.rowActions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 36px;
+  border-radius: 8px;
+  padding: 0 0.85rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.primaryButton {
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.secondaryButton {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.primaryButton:hover:not(:disabled),
+.secondaryButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.errorMessage {
+  width: min(1040px, 100%);
+  margin: 0 auto 1rem;
+  color: var(--error);
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .profilePage {
+    padding: 1rem;
+  }
+
+  .profilePanel,
+  .profileGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .profilePanel {
+    align-items: start;
+  }
+
+  .userRow {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .rowActions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
 }
