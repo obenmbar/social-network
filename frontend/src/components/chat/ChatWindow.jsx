@@ -7,18 +7,16 @@ import MessageInput from "./MessageInput";
 import styles from "./ChatWindow.module.css";
 
 export default function ChatWindow({ selectedUser, onClose, isFullPage = false }) {
-  // Ensure messages state is ALWAYS initialized as an empty array []
   const [messages, setMessages] = useState([]);
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [isFetchingHistory, setIsFetchingHistory] = useState(false);
   const { realtimeMessages } = useWebSocket();
   
-  const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
-  const scrollHeightBeforeFetch = useRef(0);
+  const previousScrollHeightRef = useRef(0);
   
   const isGroup = selectedUser?.type === "group";
   const targetId = selectedUser?.id;
@@ -32,9 +30,6 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
 
     if (cursor) {
       setIsFetchingHistory(true);
-      if (chatContainerRef.current) {
-        scrollHeightBeforeFetch.current = chatContainerRef.current.scrollHeight;
-      }
     } else {
       setLoading(true);
     }
@@ -45,23 +40,29 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
         : getChatHistory(targetId, cursor);
       
       const data = await fetchPromise;
-      const fetchedMessages = data || [];
+      const newOlderMessages = data || [];
 
-      if (fetchedMessages.length < 10) {
-        setHasMore(false);
+      // Step 3: Hide Button Condition
+      if (newOlderMessages.length < 10) {
+        setHasMoreMessages(false);
       } else {
-        setHasMore(true);
+        setHasMoreMessages(true);
       }
 
-      setMessages((prev) => {
-        if (!cursor) return fetchedMessages; // Initial load
+      if (cursor) {
+        // Step 2: Scroll Position Retention (CRITICAL)
+        // Capture BEFORE updating the state
+        if (chatContainerRef.current) {
+          previousScrollHeightRef.current = chatContainerRef.current.scrollHeight;
+        }
 
-        // Prepend older messages and filter duplicates
-        const existingIds = new Set(prev.map(m => m.id));
-        const newUniqueMessages = fetchedMessages.filter(m => !existingIds.has(m.id));
-        
-        return [...newUniqueMessages, ...prev];
-      });
+        // Prepend and strictly remove duplicates by ID
+        setMessages(prev => [...newOlderMessages, ...prev].filter((msg, idx, self) => 
+          idx === self.findIndex(m => m.id === msg.id)
+        ));
+      } else {
+        setMessages(newOlderMessages);
+      }
     } catch (err) {
       if (err.status === 403) {
         setAccessDenied(true);
@@ -78,28 +79,29 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
   useEffect(() => {
     setMessages([]);
     setAccessDenied(false);
-    setHasMore(true);
+    setHasMoreMessages(true);
+    setIsFetchingHistory(false);
     loadHistory("");
   }, [targetId, isGroup, loadHistory]);
 
   const handleLoadMore = () => {
     if (messages && messages.length > 0) {
-      const oldestMessageCursor = messages[0].created_at;
-      loadHistory(oldestMessageCursor);
+      // Step 1: The Fetch Logic - Pass the ID of the OLDEST message
+      const oldestId = messages[0]?.id;
+      loadHistory(oldestId);
     }
   };
 
-  // Scroll Retention & Auto-Scroll Guard
+  // Step 2: Scroll Position Retention (CRITICAL)
   useLayoutEffect(() => {
     if (!chatContainerRef.current) return;
 
     if (isFetchingHistory) {
-      // SCROLL JUMP FIX: Restore the user's exact scroll position
-      const newScrollHeight = chatContainerRef.current.scrollHeight;
-      chatContainerRef.current.scrollTop = newScrollHeight - scrollHeightBeforeFetch.current;
+      // Adjust scroll position right after DOM updates
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight - previousScrollHeightRef.current;
       setIsFetchingHistory(false);
     } else {
-      // STANDARD BEHAVIOR: Auto-scroll to bottom for new messages/initial load
+      // Auto-scroll to bottom for initial load and new messages
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages, isFetchingHistory]);
@@ -109,7 +111,6 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
     if (!me || !targetId || realtimeMessages.length === 0) return;
 
     setMessages((prev) => {
-      // Find all matching messages in realtimeMessages that are NOT already in the local state
       const matchingRealtime = realtimeMessages.filter((msg) => {
         const isForThisChat = isGroup 
           ? msg.group_id === targetId 
@@ -117,14 +118,11 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
             (msg.sender_id === targetId && msg.receiver_id === me.id);
         
         if (!isForThisChat) return false;
-        
-        // Prevent duplication
         return !prev.some(m => m.id === msg.id);
       });
 
       if (matchingRealtime.length === 0) return prev;
 
-      // Single source of truth: Only add when it arrives from WS
       const newMessages = [...prev, ...matchingRealtime];
       return newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     });
@@ -176,7 +174,7 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
           </div>
         ) : (
           <>
-            {hasMore && messages?.length >= 10 && (
+            {hasMoreMessages && messages?.length >= 10 && (
               <button 
                 onClick={handleLoadMore} 
                 disabled={loading}
@@ -249,7 +247,6 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
             )}
           </>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {!accessDenied && (

@@ -9,7 +9,7 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { unreadChatIds, markAsRead, setActiveChat } = useWebSocket();
+  const { unreadChatIds, lastActivityMap, markAsRead, setActiveChat } = useWebSocket();
 
   useEffect(() => {
     setLoading(true);
@@ -24,15 +24,33 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
       .finally(() => setLoading(false));
   }, [activeTab]);
 
-  // Determine which tabs have unread messages using unreadChatIds
-  const hasPrivateUnread = unreadChatIds.some(id => !groups.some(g => g.id === id));
-  const hasGroupUnread = unreadChatIds.some(id => groups.some(g => g.id === id));
+  // Determine which tabs have unread messages using prefixed unreadChatIds
+  const hasPrivateUnread = unreadChatIds.some(id => id.startsWith('private_'));
+  const hasGroupUnread = unreadChatIds.some(id => id.startsWith('group_'));
 
   const handleSelect = (target) => {
-    markAsRead(target.id);
+    const type = target.type || (target.group_id ? 'group' : 'private');
+    markAsRead(target.id, type);
     setActiveChat(target);
     onSelectTarget(target);
   };
+
+  // Dynamic sorting for users
+  const sortedUsers = [...users].sort((a, b) => {
+    const lastA = lastActivityMap[`private_${a.id}`] || 0;
+    const lastB = lastActivityMap[`private_${b.id}`] || 0;
+    if (lastB !== lastA) return lastB - lastA;
+    return (a.nickname || "").localeCompare(b.nickname || "");
+  });
+
+  // Dynamic sorting for groups
+  const visibleGroups = groups.filter(group => group.is_member);
+  const sortedGroups = [...visibleGroups].sort((a, b) => {
+    const lastA = lastActivityMap[`group_${a.id}`] || 0;
+    const lastB = lastActivityMap[`group_${b.id}`] || 0;
+    if (lastB !== lastA) return lastB - lastA;
+    return (a.title || "").localeCompare(b.title || "");
+  });
 
   return (
     <div style={sidebarContainerStyle}>
@@ -64,14 +82,14 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
           <p style={infoStyle}>Loading...</p>
         ) : activeTab === "private" ? (
           <UserList 
-            users={users} 
+            users={sortedUsers} 
             onSelect={handleSelect} 
             selectedId={selectedTargetId} 
             unreadChatIds={unreadChatIds}
           />
         ) : (
           <GroupList 
-            groups={groups} 
+            groups={sortedGroups} 
             onSelect={handleSelect} 
             selectedId={selectedTargetId} 
             unreadChatIds={unreadChatIds}
@@ -88,7 +106,7 @@ function UserList({ users, onSelect, selectedId, unreadChatIds }) {
   return (
     <ul style={listStyle}>
       {users.map(user => {
-        const isUnread = unreadChatIds.includes(user.id);
+        const isUnread = unreadChatIds.includes(`private_${user.id}`);
         return (
           <li 
             key={user.id} 
@@ -114,14 +132,12 @@ function UserList({ users, onSelect, selectedId, unreadChatIds }) {
 }
 
 function GroupList({ groups, onSelect, selectedId, unreadChatIds }) {
-  const visibleGroups = groups.filter(group => group.is_member);
-
-  if (visibleGroups.length === 0) return <p style={infoStyle}>No groups joined.</p>;
+  if (groups.length === 0) return <p style={infoStyle}>No groups joined.</p>;
 
   return (
     <ul style={listStyle}>
-      {visibleGroups.map(group => {
-        const isUnread = unreadChatIds.includes(group.id);
+      {groups.map(group => {
+        const isUnread = unreadChatIds.includes(`group_${group.id}`);
         return (
           <li 
             key={group.id} 

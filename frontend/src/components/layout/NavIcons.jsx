@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function NavIcons() {
-  const { hasNewMessage, unreadCount } = useWebSocket();
+  const { hasNewMessage, hasUnreadNotifications } = useWebSocket();
 
-  // unreadCount here represents generic notifications (likes, followers, etc.)
+  // hasUnreadNotifications represents generic social notifications (follow requests, group invites, etc.)
   // hasNewMessage represents chat specifically.
 
   return (
@@ -31,8 +31,8 @@ export default function NavIcons() {
         title="Notifications"
       >
         <span style={{ fontSize: "24px" }}>🔔</span>
-        {unreadCount > 0 && (
-          <span style={badgeStyle}>{unreadCount}</span>
+        {hasUnreadNotifications && (
+          <span style={{ position: 'absolute', top: 0, right: 0, width: '8px', height: '8px', backgroundColor: 'red', borderRadius: '50%' }}></span>
         )}
       </Link>
     </div>

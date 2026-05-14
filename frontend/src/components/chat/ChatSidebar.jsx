@@ -7,7 +7,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnly = false }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { unreadChatIds, markAsRead, setActiveChat } = useWebSocket();
+  const { unreadChatIds, lastActivityMap, markAsRead, setActiveChat } = useWebSocket();
 
   useEffect(() => {
     getFollowers()
@@ -22,22 +22,30 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
 
   const handleSelect = (user) => {
     // Step 3 & 4: Clear Local 'New' Badge & Bind markAsRead to Sidebar Click
-    markAsRead(user.id);
+    markAsRead(user.id, "private");
     setActiveChat({ ...user, type: "private" }); // Ensure active chat guard works
     onSelectUser(user);
   };
+
+  // Dynamic sorting for users
+  const sortedUsers = [...users].sort((a, b) => {
+    const lastA = lastActivityMap[`private_${a.id}`] || 0;
+    const lastB = lastActivityMap[`private_${b.id}`] || 0;
+    if (lastB !== lastA) return lastB - lastA;
+    return (a.nickname || "").localeCompare(b.nickname || "");
+  });
 
   return (
     <aside style={sidebarActiveStyle}>
       <h3 style={headerStyle}>Messages</h3>
       {loading ? (
         <p style={{ padding: "0.5rem 1rem" }}>Loading...</p>
-      ) : users.length === 0 ? (
+      ) : sortedUsers.length === 0 ? (
         <p style={{ padding: "0.5rem 1rem" }}>No followers found.</p>
       ) : (
         <ul style={listStyle}>
-          {users.map((user) => {
-            const isUnread = unreadChatIds.includes(user.id);
+          {sortedUsers.map((user) => {
+            const isUnread = unreadChatIds.includes(`private_${user.id}`);
             return (
               <li 
                 key={user.id} 

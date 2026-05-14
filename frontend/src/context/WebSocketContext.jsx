@@ -12,6 +12,8 @@ export const WebSocketProvider = ({ children }) => {
   const [realtimeNotifications, setRealtimeNotifications] = useState([]);
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const [unreadChatIds, setUnreadChatIds] = useState([]);
+  const [lastActivityMap, setLastActivityMap] = useState({});
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [me, setMe] = useState(null);
   const [activeChat, setActiveChat] = useState(null);
 
@@ -31,7 +33,7 @@ export const WebSocketProvider = ({ children }) => {
     }
   }, [pathname]);
 
-  // Social notifications filtering
+  // Social notifications filtering (only for convenience, count is state-based)
   const socialNotifications = useMemo(() => {
     return realtimeNotifications.filter(n => 
       n.type === "follow_request" || 
@@ -40,14 +42,20 @@ export const WebSocketProvider = ({ children }) => {
     );
   }, [realtimeNotifications]);
 
-  const socialUnreadCount = socialNotifications.length;
-
   const removeSocialNotification = useCallback((id) => {
     setRealtimeNotifications(prev => prev.filter(n => n.id !== id));
   }, []);
 
-  const markAsRead = useCallback((targetId) => {
-    setUnreadChatIds(prev => prev.filter(id => id !== targetId));
+  const markAsRead = useCallback((targetId, type = null) => {
+    // If type is provided (e.g. 'private' or 'group'), we can target specific prefixed ID
+    // If not, we try to clear both prefixed versions and the raw ID for safety
+    if (type) {
+      const uniqueId = `${type}_${targetId}`;
+      setUnreadChatIds(prev => prev.filter(id => id !== uniqueId));
+    } else {
+      setUnreadChatIds(prev => prev.filter(id => id !== targetId && id !== `private_${targetId}` && id !== `group_${targetId}`));
+    }
+
     setRealtimeNotifications((prev) => {
       const updated = prev.filter(n => 
         n.sender_id !== targetId && n.group_id !== targetId && n.source_id !== targetId
@@ -97,6 +105,8 @@ export const WebSocketProvider = ({ children }) => {
           // General and Social Notification logic
           if (currentMe && newMsg.sender_id === currentMe.id) return;
 
+          setHasUnreadNotifications(true);
+
           setRealtimeNotifications((prev) => {
             if (prev.some((n) => n.id === newMsg.id)) return prev;
             return [newMsg, ...prev];
@@ -107,6 +117,12 @@ export const WebSocketProvider = ({ children }) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
+
+          // Real-time 'Jump to Top'
+          const chatType = newMsg.group_id ? 'group' : 'private';
+          const targetIdForMap = newMsg.group_id || newMsg.sender_id;
+          const uniqueIdForMap = `${chatType}_${targetIdForMap}`;
+          setLastActivityMap(prev => ({ ...prev, [uniqueIdForMap]: Date.now() }));
 
           const isMe = currentMe && newMsg.sender_id === currentMe.id;
           if (isMe) return;
@@ -119,8 +135,10 @@ export const WebSocketProvider = ({ children }) => {
 
           if (!isLookingAtChat) {
             setHasNewMessage(true);
+            const type = newMsg.group_id ? 'group' : 'private';
             const targetId = newMsg.group_id || newMsg.sender_id;
-            setUnreadChatIds(prev => Array.from(new Set([...prev, targetId])));
+            const uniqueId = `${type}_${targetId}`;
+            setUnreadChatIds(prev => Array.from(new Set([...prev, uniqueId])));
             
             setRealtimeNotifications((prev) => {
               if (prev.some((n) => n.id === newMsg.id)) return prev;
@@ -148,6 +166,13 @@ export const WebSocketProvider = ({ children }) => {
   const sendMessage = useCallback((message) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(message));
+      
+      // Real-time 'Jump to Top' on sending
+      const chatType = message.group_id ? 'group' : 'private';
+      const targetIdForMap = message.group_id || message.receiver_id;
+      const uniqueIdForMap = `${chatType}_${targetIdForMap}`;
+      setLastActivityMap(prev => ({ ...prev, [uniqueIdForMap]: Date.now() }));
+
       return true;
     }
     return false;
@@ -164,8 +189,11 @@ export const WebSocketProvider = ({ children }) => {
     realtimeMessages,
     realtimeNotifications,
     unreadChatIds,
+    lastActivityMap,
+    setLastActivityMap,
     socialNotifications,
-    socialUnreadCount,
+    hasUnreadNotifications,
+    setHasUnreadNotifications,
     hasNewMessage,
     activeChat,
     setActiveChat,
