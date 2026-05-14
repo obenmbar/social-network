@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from "react";
+import Link from "next/link";
 import { getChatHistory, getGroupChatHistory, getCurrentUser, mediaUrl } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import MessageInput from "./MessageInput";
@@ -211,7 +212,9 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
                     style={{ flexDirection: isMe ? "row-reverse" : "row" }}
                   >
                     <div className={styles.avatarContainer}>
-                      <img src={senderAvatar} className={styles.bubbleAvatar} alt="" />
+                      <Link href={`/profile/${msg.sender_id}`}>
+                        <img src={senderAvatar} className={styles.bubbleAvatar} alt="" />
+                      </Link>
                     </div>
 
                     <div className={styles.messageBubbleContainer} style={{ alignItems: isMe ? "flex-end" : "flex-start" }}>
