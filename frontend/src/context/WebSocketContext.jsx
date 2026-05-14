@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useEffect, useState, useRef, useCallback } from "react";
+import React, { createContext, useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { hasSession } from "@/lib/session";
 import { getCurrentUser } from "@/lib/api";
@@ -11,7 +11,6 @@ export const WebSocketProvider = ({ children }) => {
   const [realtimeMessages, setRealtimeMessages] = useState([]);
   const [realtimeNotifications, setRealtimeNotifications] = useState([]);
   const [hasNewMessage, setHasNewMessage] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0); 
   const [me, setMe] = useState(null);
   const [activeChat, setActiveChat] = useState(null);
 
@@ -31,6 +30,21 @@ export const WebSocketProvider = ({ children }) => {
     }
   }, [pathname]);
 
+  // Social notifications filtering
+  const socialNotifications = useMemo(() => {
+    return realtimeNotifications.filter(n => 
+      n.type === "follow_request" || 
+      n.type === "group_invite" || 
+      n.type === "group_request"
+    );
+  }, [realtimeNotifications]);
+
+  const socialUnreadCount = socialNotifications.length;
+
+  const removeSocialNotification = useCallback((id) => {
+    setRealtimeNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
+
   const markAsRead = useCallback((targetId) => {
     setRealtimeNotifications((prev) => {
       const updated = prev.filter(n => 
@@ -42,7 +56,6 @@ export const WebSocketProvider = ({ children }) => {
         setHasNewMessage(false);
       }
       
-      setUnreadCount(updated.length);
       return updated;
     });
   }, []);
@@ -60,10 +73,12 @@ export const WebSocketProvider = ({ children }) => {
     if (socketRef.current?.readyState === WebSocket.OPEN || socketRef.current?.readyState === WebSocket.CONNECTING) return;
 
     const wsUrl = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8080/ws`;
+    console.log("Connecting to WebSocket:", wsUrl);
     const ws = new WebSocket(wsUrl);
     socketRef.current = ws;
 
     ws.onopen = () => {
+      console.log("🟢 WS Connected");
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
@@ -77,15 +92,15 @@ export const WebSocketProvider = ({ children }) => {
         const currentActiveChat = activeChatRef.current;
 
         if (newMsg.type) {
+          // General and Social Notification logic
           if (currentMe && newMsg.sender_id === currentMe.id) return;
 
           setRealtimeNotifications((prev) => {
             if (prev.some((n) => n.id === newMsg.id)) return prev;
-            const next = [newMsg, ...prev];
-            setUnreadCount(next.length);
-            return next;
+            return [newMsg, ...prev];
           });
         } else {
+          // Chat Message logic
           setRealtimeMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
@@ -98,14 +113,12 @@ export const WebSocketProvider = ({ children }) => {
             setHasNewMessage(true);
             setRealtimeNotifications((prev) => {
               if (prev.some((n) => n.id === newMsg.id)) return prev;
-              const next = [newMsg, ...prev];
-              setUnreadCount(next.length);
-              return next;
+              return [newMsg, ...prev];
             });
           }
         }
       } catch (err) {
-        console.error("WS error:", err);
+        console.error("WS error parsing message:", err);
       }
     };
 
@@ -117,6 +130,8 @@ export const WebSocketProvider = ({ children }) => {
         }
       }
     };
+
+    ws.onerror = (err) => console.error("WS error:", err);
   }, [pathname]);
 
   const sendMessage = useCallback((message) => {
@@ -137,12 +152,14 @@ export const WebSocketProvider = ({ children }) => {
   const value = {
     realtimeMessages,
     realtimeNotifications,
+    socialNotifications,
+    socialUnreadCount,
     hasNewMessage,
-    unreadCount,
     activeChat,
     setActiveChat,
     sendMessage,
     markAsRead,
+    removeSocialNotification,
     me,
   };
 

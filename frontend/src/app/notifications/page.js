@@ -98,7 +98,7 @@ export default function NotificationsPage() {
           {allNotifications.map((notif) => (
             <li key={notif.id} style={{
               ...itemStyle,
-              background: notif.is_read ? "transparent" : "#f0f7ff"
+              background: notif.is_read ? "transparent" : "rgba(255, 255, 255, 0.05)"
             }}>
               <div style={iconStyle}>{getIcon(notif.type)}</div>
               <div style={{ flex: 1 }}>
@@ -150,15 +150,15 @@ function getIcon(type) {
 }
 
 const containerStyle = { maxWidth: "800px", margin: "2rem auto", padding: "0 1rem" };
-const headerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" };
-const listStyle = { listStyle: "none", padding: 0, margin: 0, background: "white", borderRadius: "8px", border: "1px solid #eee" };
-const itemStyle = { padding: "1.25rem", borderBottom: "1px solid #eee", display: "flex", alignItems: "center", gap: "1rem" };
+const headerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", color: "var(--text-main, #ffffff)" };
+const listStyle = { listStyle: "none", padding: 0, margin: 0, background: "var(--bg-sidebar, #1e1e1e)", borderRadius: "8px", border: "1px solid var(--border-color, #333)", boxShadow: "0 4px 6px rgba(0, 0, 0, 0.5)" };
+const itemStyle = { padding: "1.25rem", borderBottom: "1px solid var(--border-color, #333)", display: "flex", alignItems: "center", gap: "1rem", color: "var(--text-main, #ffffff)" };
 const iconStyle = { fontSize: "1.5rem" };
-const textStyle = { margin: 0, fontWeight: "500" };
-const timeStyle = { color: "#888", fontSize: "0.8rem" };
+const textStyle = { margin: 0, fontWeight: "500", color: "var(--text-main, #ffffff)" };
+const timeStyle = { color: "var(--text-secondary, #aaaaaa)", fontSize: "0.8rem" };
 const actionRowStyle = { display: "flex", gap: "10px", marginTop: "10px" };
 const acceptButtonStyle = { background: "#28a745", color: "white", border: "none", padding: "6px 12px", borderRadius: "4px", cursor: "pointer", fontSize: "0.85rem", fontWeight: "bold" };
 const declineButtonStyle = { background: "#dc3545", color: "white", border: "none", padding: "6px 12px", borderRadius: "4px", cursor: "pointer", fontSize: "0.85rem", fontWeight: "bold" };
-const readButtonStyle = { background: "#e9ecef", border: "none", padding: "4px 8px", borderRadius: "4px", fontSize: "0.8rem", cursor: "pointer" };
-const infoStyle = { textAlign: "center", padding: "2rem", color: "#888" };
-const emptyStyle = { textAlign: "center", padding: "4rem 2rem", background: "white", borderRadius: "8px", border: "1px solid #eee" };
+const readButtonStyle = { background: "#2a2a2a", color: "white", border: "none", padding: "4px 8px", borderRadius: "4px", fontSize: "0.8rem", cursor: "pointer" };
+const infoStyle = { textAlign: "center", padding: "2rem", color: "var(--text-secondary, #aaaaaa)" };
+const emptyStyle = { textAlign: "center", padding: "4rem 2rem", background: "var(--bg-sidebar, #1e1e1e)", borderRadius: "8px", border: "1px solid var(--border-color, #333)", boxShadow: "0 4px 6px rgba(0, 0, 0, 0.5)", color: "var(--text-main, #ffffff)" };
