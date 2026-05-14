@@ -29,8 +29,8 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
 
   // Dynamic sorting for users
   const sortedUsers = [...users].sort((a, b) => {
-    const lastA = lastActivityMap[`private_${a.id}`] || 0;
-    const lastB = lastActivityMap[`private_${b.id}`] || 0;
+    const lastA = lastActivityMap[`private_${a.id}`] || (a.last_activity ? new Date(a.last_activity).getTime() : 0);
+    const lastB = lastActivityMap[`private_${b.id}`] || (b.last_activity ? new Date(b.last_activity).getTime() : 0);
     
     // Sort by last activity descending
     if (lastB !== lastA) return lastB - lastA;

@@ -9,7 +9,7 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { unreadChatIds, lastActivityMap, markAsRead, setActiveChat } = useWebSocket();
+  const { unreadChatIds, lastActivityMap, setLastActivityMap, markAsRead, setActiveChat } = useWebSocket();
 
   useEffect(() => {
     setLoading(true);
@@ -17,6 +17,17 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
     
     fetchData
       .then((data) => {
+        if (data && data.length > 0) {
+          const updates = {};
+          data.forEach(item => {
+            if (item.last_activity) {
+              updates[`${activeTab}_${item.id}`] = new Date(item.last_activity).getTime();
+            }
+          });
+          if (Object.keys(updates).length > 0) {
+            setLastActivityMap(prev => ({ ...prev, ...updates }));
+          }
+        }
         if (activeTab === "private") setUsers(data || []);
         else setGroups(data || []);
       })
@@ -37,8 +48,8 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
 
   // Dynamic sorting for users
   const sortedUsers = [...users].sort((a, b) => {
-    const lastA = lastActivityMap[`private_${a.id}`] || 0;
-    const lastB = lastActivityMap[`private_${b.id}`] || 0;
+    const lastA = lastActivityMap[`private_${a.id}`] || (a.last_activity ? new Date(a.last_activity).getTime() : 0);
+    const lastB = lastActivityMap[`private_${b.id}`] || (b.last_activity ? new Date(b.last_activity).getTime() : 0);
     
     // Sort by last activity descending
     if (lastB !== lastA) return lastB - lastA;
@@ -52,8 +63,8 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
   // Dynamic sorting for groups
   const visibleGroups = groups.filter(group => group.is_member);
   const sortedGroups = [...visibleGroups].sort((a, b) => {
-    const lastA = lastActivityMap[`group_${a.id}`] || 0;
-    const lastB = lastActivityMap[`group_${b.id}`] || 0;
+    const lastA = lastActivityMap[`group_${a.id}`] || (a.last_activity ? new Date(a.last_activity).getTime() : 0);
+    const lastB = lastActivityMap[`group_${b.id}`] || (b.last_activity ? new Date(b.last_activity).getTime() : 0);
     
     // Sort by last activity descending
     if (lastB !== lastA) return lastB - lastA;

@@ -119,11 +119,15 @@ func (r *Repository) CreateFollower(followerID, followedID string) error {
 
 func (r *Repository) GetFollowers(userID string) ([]Author, error) {
 	rows, err := r.db.Query(`
-		SELECT u.id, u.first_name, u.last_name, u.nickname, u.avatar
+		SELECT u.id, u.first_name, u.last_name, u.nickname, u.avatar,
+		       (SELECT MAX(created_at) FROM messages 
+		        WHERE (sender_id = ? AND receiver_id = u.id) 
+		           OR (sender_id = u.id AND receiver_id = ?)
+		       ) as last_activity
 		FROM followers f
 		JOIN users u ON u.id = f.follower_id
 		WHERE f.followed_id = ? AND u.nickname IS NOT NULL AND TRIM(u.nickname) != ''
-		ORDER BY LOWER(u.nickname) ASC`, userID)
+		ORDER BY LOWER(u.nickname) ASC`, userID, userID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get followers: %w", err)
 	}
@@ -132,7 +136,7 @@ func (r *Repository) GetFollowers(userID string) ([]Author, error) {
 	followers := []Author{}
 	for rows.Next() {
 		var follower Author
-		if err := rows.Scan(&follower.ID, &follower.FirstName, &follower.LastName, &follower.Nickname, &follower.Avatar); err != nil {
+		if err := rows.Scan(&follower.ID, &follower.FirstName, &follower.LastName, &follower.Nickname, &follower.Avatar, &follower.LastActivity); err != nil {
 			return nil, fmt.Errorf("failed to scan follower: %w", err)
 		}
 		followers = append(followers, follower)
@@ -445,7 +449,8 @@ func groupSelectSQL() string {
 		       (SELECT COUNT(*) FROM group_members gm_count WHERE gm_count.group_id = g.id) AS member_count,
 		       EXISTS (SELECT 1 FROM group_members gm WHERE gm.group_id = g.id AND gm.user_id = ?) AS is_member,
 		       EXISTS (SELECT 1 FROM group_join_requests gr WHERE gr.group_id = g.id AND gr.user_id = ? AND gr.status = 'pending') AS has_request,
-		       EXISTS (SELECT 1 FROM group_invitations gi WHERE gi.group_id = g.id AND gi.invitee_id = ? AND gi.status = 'pending') AS has_invite
+		       EXISTS (SELECT 1 FROM group_invitations gi WHERE gi.group_id = g.id AND gi.invitee_id = ? AND gi.status = 'pending') AS has_invite,
+		       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id) as last_activity
 		FROM groups g
 		JOIN users u ON u.id = g.creator_id`
 }
@@ -459,7 +464,7 @@ func scanGroup(row scanner) (*Group, error) {
 	if err := row.Scan(
 		&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.CreatedAt,
 		&group.Creator.ID, &group.Creator.FirstName, &group.Creator.LastName, &group.Creator.Nickname, &group.Creator.Avatar,
-		&group.MemberCount, &group.IsMember, &group.HasRequest, &group.HasInvite,
+		&group.MemberCount, &group.IsMember, &group.HasRequest, &group.HasInvite, &group.LastActivity,
 	); err != nil {
 		return nil, err
 	}
