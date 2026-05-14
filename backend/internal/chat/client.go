@@ -51,8 +51,25 @@ func (c *Client) ReadPump() {
 			continue
 		}
 
+		// Ensure msg.SenderID is strictly overridden by the secure session's UserID
 		msg.SenderID = c.UserID
 		msg.SenderNickname = c.Nickname
+
+		// Step 2: Secure the WebSocket Message Broadcasting (Authorization Checks)
+		if msg.GroupID != nil && *msg.GroupID != "" {
+			isMember, err := c.Hub.Repo.IsGroupMember(c.UserID, *msg.GroupID)
+			if err != nil || !isMember {
+				log.Printf("Security Alert: User %s attempted to send unauthorized group message to %s", c.UserID, *msg.GroupID)
+				continue // Drop the malicious/unauthorized message
+			}
+		} else if msg.ReceiverID != nil && *msg.ReceiverID != "" {
+			hasPermission, err := c.Hub.Repo.IsMutualFollow(c.UserID, *msg.ReceiverID)
+			if err != nil || !hasPermission {
+				log.Printf("Security Alert: User %s attempted to send unauthorized message to %s", c.UserID, *msg.ReceiverID)
+				continue // Drop the malicious/unauthorized message
+			}
+		}
+
 		c.Hub.Broadcast <- &msg
 	}
 }

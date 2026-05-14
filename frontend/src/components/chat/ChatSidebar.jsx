@@ -7,7 +7,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnly = false }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { realtimeMessages } = useWebSocket();
+  const { realtimeNotifications, markAsRead, setActiveChat } = useWebSocket();
 
   useEffect(() => {
     getFollowers()
@@ -17,11 +17,18 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
   }, []);
 
   // Set of user IDs who have unread messages in the current session
-  const unreadUserIds = new Set(realtimeMessages.map((m) => m.sender_id));
+  const unreadUserIds = new Set(realtimeNotifications.filter(m => !m.type).map((m) => m.sender_id));
 
   const sidebarActiveStyle = isSidebarOnly 
-    ? { ...sidebarStyle, position: "static", height: "100%", borderLeft: "none", borderRight: "1px solid #eee", boxShadow: "none" } 
+    ? { ...sidebarStyle, position: "static", height: "100%", borderLeft: "none", borderRight: "1px solid #333", boxShadow: "none" } 
     : sidebarStyle;
+
+  const handleSelect = (user) => {
+    // Step 3 & 4: Clear Local 'New' Badge & Bind markAsRead to Sidebar Click
+    markAsRead(user.id);
+    setActiveChat({ ...user, type: "private" }); // Ensure active chat guard works
+    onSelectUser(user);
+  };
 
   return (
     <aside style={sidebarActiveStyle}>
@@ -37,9 +44,9 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
               key={user.id} 
               style={{
                 ...itemStyle,
-                background: selectedUserId === user.id ? "#f0f7ff" : "transparent"
+                background: selectedUserId === user.id ? "#2c3e50" : "transparent"
               }}
-              onClick={() => onSelectUser(user)}
+              onClick={() => handleSelect(user)}
             >
               <div style={avatarContainer}>
                 {user.avatar ? (
@@ -74,8 +81,8 @@ const sidebarStyle = {
   top: "60px", 
   width: "300px",
   height: "calc(100vh - 60px)",
-  background: "white",
-  borderLeft: "1px solid #eee",
+  background: "#121212",
+  borderLeft: "1px solid #333",
   boxShadow: "-2px 0 5px rgba(0,0,0,0.05)",
   zIndex: 1000,
   overflowY: "auto",
@@ -84,8 +91,9 @@ const sidebarStyle = {
 const headerStyle = {
   padding: "1rem",
   margin: 0,
-  borderBottom: "1px solid #eee",
+  borderBottom: "1px solid #333",
   fontSize: "1.1rem",
+  color: "white",
 };
 
 const listStyle = {
@@ -98,9 +106,10 @@ const itemStyle = {
   display: "flex",
   alignItems: "center",
   padding: "0.75rem 1rem",
-  borderBottom: "1px solid #f9f9f9",
+  borderBottom: "1px solid #333",
   cursor: "pointer",
   transition: "background 0.2s",
+  color: "white",
 };
 
 const avatarContainer = {
@@ -119,7 +128,7 @@ const placeholderAvatar = {
   width: "40px",
   height: "40px",
   borderRadius: "50%",
-  background: "#eee",
+  background: "#333",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -145,7 +154,7 @@ const nameStyle = {
 
 const nicknameStyle = {
   fontSize: "0.85rem",
-  color: "#888",
+  color: "#aaaaaa",
 };
 
 const unreadBadge = {

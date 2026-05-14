@@ -9,7 +9,7 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { realtimeMessages } = useWebSocket();
+  const { realtimeNotifications, markAsRead, setActiveChat } = useWebSocket();
 
   useEffect(() => {
     setLoading(true);
@@ -24,9 +24,16 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
       .finally(() => setLoading(false));
   }, [activeTab]);
 
-  // Determine which tabs have unread messages
-  const hasPrivateUnread = realtimeMessages.some(m => m.receiver_id && !m.group_id);
-  const hasGroupUnread = realtimeMessages.some(m => m.group_id);
+  // Determine which tabs have unread messages using realtimeNotifications
+  const hasPrivateUnread = realtimeNotifications.some(m => !m.type && m.receiver_id && !m.group_id);
+  const hasGroupUnread = realtimeNotifications.some(m => !m.type && m.group_id);
+
+  const handleSelect = (target) => {
+    // Step 3 & 4: Clear Local 'New' Badge & Bind markAsRead to Sidebar Click
+    markAsRead(target.id);
+    setActiveChat(target); // Ensure active chat guard works in context
+    onSelectTarget(target);
+  };
 
   return (
     <div style={sidebarContainerStyle}>
@@ -36,7 +43,7 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
           style={{
             ...tabStyle,
             borderBottom: activeTab === "private" ? "3px solid #007bff" : "3px solid transparent",
-            color: activeTab === "private" ? "#007bff" : "#666"
+            color: activeTab === "private" ? "#4dabf5" : "#aaaaaa"
           }}
         >
           Private {hasPrivateUnread && <span style={dotStyle} />}
@@ -46,7 +53,7 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
           style={{
             ...tabStyle,
             borderBottom: activeTab === "group" ? "3px solid #007bff" : "3px solid transparent",
-            color: activeTab === "group" ? "#007bff" : "#666"
+            color: activeTab === "group" ? "#4dabf5" : "#aaaaaa"
           }}
         >
           Groups {hasGroupUnread && <span style={dotStyle} />}
@@ -59,16 +66,16 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
         ) : activeTab === "private" ? (
           <UserList 
             users={users} 
-            onSelect={onSelectTarget} 
+            onSelect={handleSelect} 
             selectedId={selectedTargetId} 
-            realtimeMessages={realtimeMessages}
+            notifications={realtimeNotifications}
           />
         ) : (
           <GroupList 
             groups={groups} 
-            onSelect={onSelectTarget} 
+            onSelect={handleSelect} 
             selectedId={selectedTargetId} 
-            realtimeMessages={realtimeMessages}
+            notifications={realtimeNotifications}
           />
         )}
       </div>
@@ -76,8 +83,8 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
   );
 }
 
-function UserList({ users, onSelect, selectedId, realtimeMessages }) {
-  const unreadSenderIds = new Set(realtimeMessages.filter(m => !m.group_id).map(m => m.sender_id));
+function UserList({ users, onSelect, selectedId, notifications }) {
+  const unreadSenderIds = new Set(notifications.filter(m => !m.type && !m.group_id).map(m => m.sender_id));
   
   if (users.length === 0) return <p style={infoStyle}>No followers yet.</p>;
 
@@ -89,7 +96,7 @@ function UserList({ users, onSelect, selectedId, realtimeMessages }) {
           onClick={() => onSelect({ ...user, type: "private" })}
           style={{
             ...itemStyle,
-            background: selectedId === user.id ? "#f0f7ff" : "transparent"
+            background: selectedId === user.id ? "#2c3e50" : "transparent"
           }}
         >
           <div style={avatarStyle}>
@@ -106,23 +113,26 @@ function UserList({ users, onSelect, selectedId, realtimeMessages }) {
   );
 }
 
-function GroupList({ groups, onSelect, selectedId, realtimeMessages }) {
-  const unreadGroupIds = new Set(realtimeMessages.filter(m => m.group_id).map(m => m.group_id));
+function GroupList({ groups, onSelect, selectedId, notifications }) {
+  const unreadGroupIds = new Set(notifications.filter(m => !m.type && m.group_id).map(m => m.group_id));
 
-  if (groups.length === 0) return <p style={infoStyle}>No groups joined.</p>;
+  // Task 3: Fix Sidebar Group Visibility
+  const visibleGroups = groups.filter(group => group.is_member);
+
+  if (visibleGroups.length === 0) return <p style={infoStyle}>No groups joined.</p>;
 
   return (
     <ul style={listStyle}>
-      {groups.map(group => (
+      {visibleGroups.map(group => (
         <li 
           key={group.id} 
           onClick={() => onSelect({ ...group, type: "group" })}
           style={{
             ...itemStyle,
-            background: selectedId === group.id ? "#f0f7ff" : "transparent"
+            background: selectedId === group.id ? "#2c3e50" : "transparent"
           }}
         >
-          <div style={{ ...avatarStyle, borderRadius: "8px", background: "#e9ecef" }}>G</div>
+          <div style={{ ...avatarStyle, borderRadius: "8px", background: "#333" }}>G</div>
           <div style={{ flex: 1 }}>
             <div style={nameStyle}>{group.title}</div>
             <div style={subStyle}>{group.description?.substring(0, 30)}...</div>
@@ -138,13 +148,13 @@ const sidebarContainerStyle = {
   display: "flex",
   flexDirection: "column",
   height: "100%",
-  background: "white",
-  borderRight: "1px solid #eee",
+  background: "#121212",
+  borderRight: "1px solid #333",
 };
 
 const tabContainerStyle = {
   display: "flex",
-  borderBottom: "1px solid #eee",
+  borderBottom: "1px solid #333",
 };
 
 const tabStyle = {
@@ -173,14 +183,14 @@ const itemStyle = {
   alignItems: "center",
   padding: "0.75rem 1rem",
   cursor: "pointer",
-  borderBottom: "1px solid #f8f9fa",
+  borderBottom: "1px solid #333",
 };
 
 const avatarStyle = {
   width: "40px",
   height: "40px",
   borderRadius: "50%",
-  background: "#eee",
+  background: "#333",
   marginRight: "0.75rem",
   display: "flex",
   alignItems: "center",
@@ -191,9 +201,9 @@ const avatarStyle = {
 
 const imgStyle = { width: "100%", height: "100%", objectFit: "cover" };
 
-const nameStyle = { fontWeight: "600", fontSize: "0.95rem" };
-const subStyle = { fontSize: "0.8rem", color: "#888" };
-const infoStyle = { padding: "1rem", color: "#888", textAlign: "center" };
+const nameStyle = { fontWeight: "600", fontSize: "0.95rem", color: "white" };
+const subStyle = { fontSize: "0.8rem", color: "#aaaaaa" };
+const infoStyle = { padding: "1rem", color: "#aaaaaa", textAlign: "center" };
 
 const dotStyle = { width: "8px", height: "8px", background: "#007bff", borderRadius: "50%" };
 

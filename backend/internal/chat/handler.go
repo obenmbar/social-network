@@ -75,7 +75,19 @@ func (h *Handler) GetHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	messages, err := h.repo.GetPrivateMessages(currentUserID, otherUserID)
+	// Step 1: Secure the HTTP History Endpoints (Private)
+	hasPermission, err := h.repo.IsMutualFollow(currentUserID, otherUserID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !hasPermission {
+		http.Error(w, "Forbidden: No follow relationship", http.StatusForbidden)
+		return
+	}
+
+	cursor := r.URL.Query().Get("cursor")
+	messages, err := h.repo.GetPrivateMessages(currentUserID, otherUserID, cursor, 10)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -98,27 +110,19 @@ func (h *Handler) GetGroupHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify membership
-	memberIDs, err := h.repo.GetGroupMembers(groupID)
+	// Step 1: Secure the HTTP History Endpoints (Group)
+	isMember, err := h.repo.IsGroupMember(currentUserID, groupID)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	isMember := false
-	for _, id := range memberIDs {
-		if id == currentUserID {
-			isMember = true
-			break
-		}
-	}
-
 	if !isMember {
 		http.Error(w, "Forbidden: Not a group member", http.StatusForbidden)
 		return
 	}
 
-	messages, err := h.repo.GetGroupMessages(groupID)
+	cursor := r.URL.Query().Get("cursor")
+	messages, err := h.repo.GetGroupMessages(groupID, cursor, 10)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

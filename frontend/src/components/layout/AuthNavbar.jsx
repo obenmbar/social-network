@@ -8,7 +8,7 @@ import { removeSession } from "@/lib/session";
 import NavIcons from "./NavIcons";
 import styles from "./AuthNavbar.module.css";
 
-export default function AuthNavbar({ user }) {
+export default function AuthNavbar({ user, theme, setTheme }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const avatarInitial = user?.first_name?.trim()?.charAt(0)?.toUpperCase() || "?";
@@ -31,6 +31,13 @@ export default function AuthNavbar({ user }) {
       </Link>
 
       <nav className={styles.navActions} aria-label="Main navigation">
+        <button 
+          onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }}
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
         <Link href="/groups" className={styles.navLink}>
           Groups
         </Link>

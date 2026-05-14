@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import SidebarManager from "@/components/chat/SidebarManager";
 import ChatWindow from "@/components/chat/ChatWindow";
 import { getCurrentUser } from "@/lib/api";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function ChatPage() {
-  const [selectedTarget, setSelectedTarget] = useState(null);
+  const { activeChat, setActiveChat } = useWebSocket();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -39,15 +40,15 @@ export default function ChatPage() {
     <div style={pageContainerStyle}>
       <div style={sidebarWrapperStyle}>
         <SidebarManager 
-          onSelectTarget={setSelectedTarget} 
-          selectedTargetId={selectedTarget?.id} 
+          onSelectTarget={setActiveChat} 
+          selectedTargetId={activeChat?.id} 
         />
       </div>
       
       <main style={mainContentStyle}>
-        {selectedTarget ? (
+        {activeChat ? (
           <ChatWindow 
-            selectedUser={selectedTarget} 
+            selectedUser={activeChat} 
             isFullPage={true} 
           />
         ) : (
@@ -65,7 +66,8 @@ export default function ChatPage() {
 const pageContainerStyle = {
   display: "flex",
   height: "calc(100vh - 64px)",
-  background: "white",
+  background: "#121212",
+  color: "white",
   overflow: "hidden",
 };
 
@@ -78,7 +80,7 @@ const mainContentStyle = {
   flex: 1,
   display: "flex",
   flexDirection: "column",
-  background: "#f0f2f5",
+  background: "#1e1e1e",
 };
 
 const emptyStateStyle = {

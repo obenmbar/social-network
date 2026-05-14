@@ -64,18 +64,20 @@ export default function MessageInput({ target, onSendMessage }) {
 const formStyle = {
   display: "flex",
   padding: "1rem",
-  borderTop: "1px solid #eee",
+  borderTop: "1px solid #333",
   gap: "0.5rem",
-  background: "white",
+  background: "#121212",
 };
 
 const inputStyle = {
   flex: 1,
   padding: "0.5rem 0.75rem",
   borderRadius: "20px",
-  border: "1px solid #ddd",
+  border: "1px solid #444",
   outline: "none",
   fontSize: "0.9rem",
+  background: "#1e1e1e",
+  color: "white",
 };
 
 const buttonStyle = {

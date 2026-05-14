@@ -12,9 +12,14 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [theme, setTheme] = useState('dark');
 
   const isAuthRoute = authRoutes.has(pathname);
   const hasLocalSession = hasSession();
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     let isMounted = true;
@@ -121,7 +126,7 @@ export default function AppShell({ children }) {
   if (hasLocalSession) {
     return (
       <>
-        {user && <AuthNavbar user={user} />}
+        {user && <AuthNavbar user={user} theme={theme} setTheme={setTheme} />}
         {children}
       </>
     );

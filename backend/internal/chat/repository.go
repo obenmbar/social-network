@@ -15,25 +15,34 @@ func NewRepository(db *sql.DB) *Repository {
 }
 
 func (r *Repository) SaveMessage(msg *Message) error {
-	query := `INSERT INTO messages (id, sender_id, receiver_id, group_id, content) VALUES (?, ?, ?, ?, ?)`
-	_, err := r.db.Exec(query, msg.ID, msg.SenderID, msg.ReceiverID, msg.GroupID, msg.Content)
+	query := `INSERT INTO messages (id, sender_id, receiver_id, group_id, content, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+	_, err := r.db.Exec(query, msg.ID, msg.SenderID, msg.ReceiverID, msg.GroupID, msg.Content, msg.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to save message: %w", err)
 	}
 	return nil
 }
 
-func (r *Repository) GetPrivateMessages(user1ID, user2ID string) ([]Message, error) {
+func (r *Repository) GetPrivateMessages(user1ID, user2ID, cursor string, limit int) ([]Message, error) {
 	query := `
 		SELECT m.id, m.sender_id, m.receiver_id, m.group_id, m.content, m.created_at,
+		       u.nickname as sender_nickname,
 		       (u.first_name || ' ' || u.last_name) as sender_name
 		FROM messages m
 		JOIN users u ON m.sender_id = u.id
-		WHERE (m.sender_id = ? AND m.receiver_id = ?)
-		   OR (m.sender_id = ? AND m.receiver_id = ?)
-		ORDER BY m.created_at ASC`
+		WHERE ((m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?))`
+	
+	args := []interface{}{user1ID, user2ID, user2ID, user1ID}
 
-	rows, err := r.db.Query(query, user1ID, user2ID, user2ID, user1ID)
+	if cursor != "" {
+		query += ` AND m.created_at < ?`
+		args = append(args, cursor)
+	}
+
+	query += ` ORDER BY m.created_at DESC LIMIT ?`
+	args = append(args, limit)
+
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get private messages: %w", err)
 	}
@@ -42,26 +51,41 @@ func (r *Repository) GetPrivateMessages(user1ID, user2ID string) ([]Message, err
 	var messages []Message
 	for rows.Next() {
 		var msg Message
-		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID, &msg.Content, &msg.CreatedAt, &msg.SenderName)
+		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID, &msg.Content, &msg.CreatedAt, &msg.SenderNickname, &msg.SenderName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan message: %w", err)
 		}
 		messages = append(messages, msg)
 	}
 
+	// Reverse messages to return them in ascending chronological order
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+
 	return messages, nil
 }
 
-func (r *Repository) GetGroupMessages(groupID string) ([]Message, error) {
+func (r *Repository) GetGroupMessages(groupID, cursor string, limit int) ([]Message, error) {
 	query := `
 		SELECT m.id, m.sender_id, m.receiver_id, m.group_id, m.content, m.created_at,
+		       u.nickname as sender_nickname,
 		       (u.first_name || ' ' || u.last_name) as sender_name
 		FROM messages m
 		JOIN users u ON m.sender_id = u.id
-		WHERE m.group_id = ?
-		ORDER BY m.created_at ASC`
+		WHERE m.group_id = ?`
 
-	rows, err := r.db.Query(query, groupID)
+	args := []interface{}{groupID}
+
+	if cursor != "" {
+		query += ` AND m.created_at < ?`
+		args = append(args, cursor)
+	}
+
+	query += ` ORDER BY m.created_at DESC LIMIT ?`
+	args = append(args, limit)
+
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get group messages: %w", err)
 	}
@@ -70,11 +94,16 @@ func (r *Repository) GetGroupMessages(groupID string) ([]Message, error) {
 	var messages []Message
 	for rows.Next() {
 		var msg Message
-		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID, &msg.Content, &msg.CreatedAt, &msg.SenderName)
+		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID, &msg.Content, &msg.CreatedAt, &msg.SenderNickname, &msg.SenderName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan message: %w", err)
 		}
 		messages = append(messages, msg)
+	}
+
+	// Reverse messages to return them in ascending chronological order
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
 	}
 
 	return messages, nil
@@ -126,4 +155,22 @@ func (r *Repository) GetGroupMembers(groupID string) ([]string, error) {
 	}
 
 	return userIDs, nil
+}
+
+func (r *Repository) IsGroupMember(userID, groupID string) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM group_members WHERE user_id = ? AND group_id = ?)`
+	err := r.db.QueryRow(query, userID, groupID).Scan(&exists)
+	return exists, err
+}
+
+func (r *Repository) IsMutualFollow(user1ID, user2ID string) (bool, error) {
+	var count int
+	query := `
+		SELECT COUNT(*) 
+		FROM followers 
+		WHERE (follower_id = ? AND followed_id = ?) 
+		   OR (follower_id = ? AND followed_id = ?)`
+	err := r.db.QueryRow(query, user1ID, user2ID, user2ID, user1ID).Scan(&count)
+	return count == 2, err
 }

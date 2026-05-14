@@ -199,12 +199,12 @@ export async function getNotifications() {
   return fetchAPI("/notifications");
 }
 
-export async function getChatHistory(userId) {
-  return fetchAPI(`/chat/history?user_id=${userId}`);
+export async function getChatHistory(userId, cursor = "") {
+  return fetchAPI(`/chat/history?user_id=${userId}&cursor=${cursor}`);
 }
 
-export async function getGroupChatHistory(groupId) {
-  return fetchAPI(`/chat/group/history?group_id=${groupId}`);
+export async function getGroupChatHistory(groupId, cursor = "") {
+  return fetchAPI(`/chat/group/history?group_id=${groupId}&cursor=${cursor}`);
 }
 
 export async function markNotificationRead(notificationId) {
