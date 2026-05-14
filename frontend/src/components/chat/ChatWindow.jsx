@@ -6,17 +6,20 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import MessageInput from "./MessageInput";
 import styles from "./ChatWindow.module.css";
 
+const DEFAULT_AVATAR = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y";
+
 export default function ChatWindow({ selectedUser, onClose, isFullPage = false }) {
   const [messages, setMessages] = useState([]);
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
-  const [isFetchingHistory, setIsFetchingHistory] = useState(false);
   const { realtimeMessages } = useWebSocket();
   
   const chatContainerRef = useRef(null);
   const previousScrollHeightRef = useRef(0);
+  const isAnchoringRef = useRef(false);
+  const isInitialLoadRef = useRef(true);
   
   const isGroup = selectedUser?.type === "group";
   const targetId = selectedUser?.id;
@@ -28,9 +31,7 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
   const loadHistory = useCallback(async (cursor = "") => {
     if (!targetId || !selectedUser) return;
 
-    if (cursor) {
-      setIsFetchingHistory(true);
-    } else {
+    if (!cursor) {
       setLoading(true);
     }
 
@@ -42,24 +43,20 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
       const data = await fetchPromise;
       const newOlderMessages = data || [];
 
-      // Step 3: Hide Button Condition
-      if (newOlderMessages.length < 10) {
-        setHasMoreMessages(false);
-      } else {
-        setHasMoreMessages(true);
-      }
+      setHasMoreMessages(newOlderMessages.length >= 10);
 
       if (cursor) {
-        // Step 2: Scroll Position Retention (CRITICAL)
-        // Capture BEFORE updating the state
         if (chatContainerRef.current) {
           previousScrollHeightRef.current = chatContainerRef.current.scrollHeight;
+          isAnchoringRef.current = true;
         }
 
-        // Prepend and strictly remove duplicates by ID
-        setMessages(prev => [...newOlderMessages, ...prev].filter((msg, idx, self) => 
-          idx === self.findIndex(m => m.id === msg.id)
-        ));
+        setMessages(prev => {
+          const combined = [...newOlderMessages, ...prev];
+          return combined.filter((msg, idx, self) => 
+            idx === self.findIndex(m => m.id === msg.id)
+          );
+        });
       } else {
         setMessages(newOlderMessages);
       }
@@ -75,36 +72,38 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
     }
   }, [targetId, isGroup, selectedUser]);
 
-  // Initial load on target change
   useEffect(() => {
     setMessages([]);
     setAccessDenied(false);
     setHasMoreMessages(true);
-    setIsFetchingHistory(false);
+    isInitialLoadRef.current = true;
     loadHistory("");
   }, [targetId, isGroup, loadHistory]);
 
   const handleLoadMore = () => {
-    if (messages && messages.length > 0) {
-      // Step 1: The Fetch Logic - Pass the ID of the OLDEST message
+    if (messages && messages.length > 0 && !loading) {
       const oldestId = messages[0]?.id;
       loadHistory(oldestId);
     }
   };
 
-  // Step 2: Scroll Position Retention (CRITICAL)
   useLayoutEffect(() => {
     if (!chatContainerRef.current) return;
 
-    if (isFetchingHistory) {
-      // Adjust scroll position right after DOM updates
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight - previousScrollHeightRef.current;
-      setIsFetchingHistory(false);
-    } else {
-      // Auto-scroll to bottom for initial load and new messages
+    if (isAnchoringRef.current) {
+      const newHeight = chatContainerRef.current.scrollHeight;
+      chatContainerRef.current.scrollTop = newHeight - previousScrollHeightRef.current;
+      isAnchoringRef.current = false;
+    } else if (isInitialLoadRef.current && messages.length > 0) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      isInitialLoadRef.current = false;
+    } else if (messages.length > 0) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+      if (scrollHeight - scrollTop - clientHeight < 150) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      }
     }
-  }, [messages, isFetchingHistory]);
+  }, [messages]);
 
   // Handle Realtime Messages
   useEffect(() => {
@@ -132,8 +131,8 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
 
   const displayName = isGroup ? selectedUser.title : `${selectedUser.first_name} ${selectedUser.last_name}`;
   const displaySubtitle = isGroup ? "Group Chat" : `@${selectedUser.nickname || "user"}`;
-  const myAvatarSrc = me?.avatar ? mediaUrl(me.avatar) : null;
-  const theirAvatarSrc = selectedUser.avatar ? mediaUrl(selectedUser.avatar) : null;
+  const myAvatarSrc = me?.avatar ? mediaUrl(me.avatar) : DEFAULT_AVATAR;
+  const theirAvatarSrc = selectedUser.avatar ? mediaUrl(selectedUser.avatar) : DEFAULT_AVATAR;
 
   return (
     <div className={`${styles.window} ${isFullPage ? styles.windowFullPage : ""}`}>
@@ -143,10 +142,8 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
             <div className={styles.headerAvatar}>
               {isGroup ? (
                 <span style={{ fontSize: "1.2rem" }}>👥</span>
-              ) : theirAvatarSrc ? (
-                <img src={theirAvatarSrc} className={styles.avatarImg} alt="" />
               ) : (
-                <span style={{ fontSize: "1.2rem" }}>{selectedUser.first_name?.[0] || "?"}</span>
+                <img src={theirAvatarSrc} className={styles.avatarImg} alt="" />
               )}
             </div>
             <div style={{ display: "flex", flexDirection: "column" }}>
@@ -205,8 +202,7 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
               messages.map((msg) => {
                 if (!msg) return null;
                 const isMe = me && msg.sender_id === me.id;
-                const avatarSrc = isMe ? myAvatarSrc : (isGroup ? null : theirAvatarSrc);
-                const initial = isMe ? (me?.first_name?.[0] || "M") : (msg.sender_name?.[0] || "U");
+                const senderAvatar = isMe ? myAvatarSrc : (msg.sender_avatar ? mediaUrl(msg.sender_avatar) : DEFAULT_AVATAR);
 
                 return (
                   <div
@@ -215,11 +211,7 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
                     style={{ flexDirection: isMe ? "row-reverse" : "row" }}
                   >
                     <div className={styles.avatarContainer}>
-                      {avatarSrc ? (
-                        <img src={avatarSrc} className={styles.bubbleAvatar} alt="" />
-                      ) : (
-                        <div className={styles.avatarPlaceholder}>{initial}</div>
-                      )}
+                      <img src={senderAvatar} className={styles.bubbleAvatar} alt="" />
                     </div>
 
                     <div className={styles.messageBubbleContainer} style={{ alignItems: isMe ? "flex-end" : "flex-start" }}>

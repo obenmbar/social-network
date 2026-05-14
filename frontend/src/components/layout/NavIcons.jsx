@@ -1,14 +1,27 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function NavIcons() {
   const { hasNewMessage, hasUnreadNotifications } = useWebSocket();
+  const [showRedDot, setShowRedDot] = useState(hasUnreadNotifications);
 
-  // hasUnreadNotifications represents generic social notifications (follow requests, group invites, etc.)
-  // hasNewMessage represents chat specifically.
+  useEffect(() => {
+    // Sync with context initially and whenever context state changes
+    setShowRedDot(hasUnreadNotifications);
+
+    const handleNewNotification = () => {
+      setShowRedDot(true);
+    };
+
+    window.addEventListener('new_social_notification', handleNewNotification);
+
+    return () => {
+      window.removeEventListener('new_social_notification', handleNewNotification);
+    };
+  }, [hasUnreadNotifications]);
 
   return (
     <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
@@ -31,7 +44,7 @@ export default function NavIcons() {
         title="Notifications"
       >
         <span style={{ fontSize: "24px" }}>🔔</span>
-        {hasUnreadNotifications && (
+        {showRedDot && (
           <span style={{ position: 'absolute', top: 0, right: 0, width: '8px', height: '8px', backgroundColor: 'red', borderRadius: '50%' }}></span>
         )}
       </Link>
@@ -58,21 +71,4 @@ const dotStyle = {
   height: "10px",
   borderRadius: "50%",
   border: "2px solid white",
-};
-
-const badgeStyle = {
-  position: "absolute",
-  top: "-5px",
-  right: "-5px",
-  background: "red",
-  color: "white",
-  borderRadius: "50%",
-  width: "18px",
-  height: "18px",
-  fontSize: "11px",
-  fontWeight: "bold",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  boxShadow: "0 0 0 2px white",
 };

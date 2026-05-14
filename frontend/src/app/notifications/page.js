@@ -25,7 +25,8 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     fetchData();
-    setHasUnreadNotifications(false);
+    // Clear the unread indicator when the page is opened
+    if (setHasUnreadNotifications) setHasUnreadNotifications(false);
   }, [fetchData, setHasUnreadNotifications]);
 
   const handleMarkRead = async (id) => {
@@ -72,11 +73,9 @@ export default function NotificationsPage() {
                 <p style={textStyle}>{notif.content || `New ${notif.type} notification`}</p>
                 <small style={timeStyle}>{new Date(notif.created_at).toLocaleString()}</small>
               </div>
-              {!notif.is_read && (
-                <button onClick={() => handleMarkRead(notif.id)} style={readButtonStyle}>
-                  Mark Read
-                </button>
-              )}
+              <button onClick={() => handleMarkRead(notif.id)} style={readButtonStyle}>
+                Mark Read
+              </button>
             </li>
           ))}
         </ul>

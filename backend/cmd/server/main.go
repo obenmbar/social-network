@@ -47,6 +47,12 @@ func main() {
 	notifRepo := notification.NewRepository(db)
 	notifHandler := notification.NewHandler(notifRepo)
 
+	// Chat initialization
+	chatRepo := chat.NewRepository(db)
+	chatHub := chat.NewHub(chatRepo)
+	go chatHub.Run()
+	chatWSHandler := chat.NewHandler(chatHub, chatRepo)
+
 	// Manual Dependency Injection
 	authRepo := auth.NewRepository(db)
 	authService := auth.NewService(authRepo)
@@ -55,14 +61,8 @@ func main() {
 	postsService := posts.NewService(postsRepo, filepath.Join(projectRoot, "uploads"))
 	postsHandler := posts.NewHandler(postsService)
 	groupsRepo := groups.NewRepository(db)
-	groupsService := groups.NewService(groupsRepo, notifRepo)
+	groupsService := groups.NewService(groupsRepo, notifRepo, chatHub)
 	groupsHandler := groups.NewHandler(groupsService)
-
-	// Chat initialization
-	chatRepo := chat.NewRepository(db)
-	chatHub := chat.NewHub(chatRepo)
-	go chatHub.Run()
-	chatWSHandler := chat.NewHandler(chatHub, chatRepo)
 
 	// Middlewares
 

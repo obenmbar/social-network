@@ -97,53 +97,68 @@ export const WebSocketProvider = ({ children }) => {
 
     ws.onmessage = (event) => {
       try {
-        const newMsg = JSON.parse(event.data);
+        const incoming = JSON.parse(event.data);
         const currentMe = meRef.current;
         const currentActiveChat = activeChatRef.current;
 
-        if (newMsg.type) {
-          // General and Social Notification logic
-          if (currentMe && newMsg.sender_id === currentMe.id) return;
-
+        // RELIABLE NOTIFICATION DETECTION
+        // If it's explicitly a notification signal
+        if (incoming.type === "notification") {
           setHasUnreadNotifications(true);
+          window.dispatchEvent(new Event('new_social_notification'));
+          return;
+        }
+
+        // LEGACY/FALLBACK NOTIFICATION DETECTION
+        const isNotification = incoming.notification_id || 
+                               !incoming.content || 
+                               (!incoming.sender_id && !incoming.receiver_id && !incoming.group_id);
+
+        if (isNotification) {
+          // Filter out our own messages if the backend echoes them (safety)
+          if (currentMe && incoming.sender_id === currentMe.id) return;
+
+          // Strictly for Social/System Notifications
+          setHasUnreadNotifications(true);
+          
+          // Force real-time event for UI sync
+          window.dispatchEvent(new Event('new_social_notification'));
 
           setRealtimeNotifications((prev) => {
-            if (prev.some((n) => n.id === newMsg.id)) return prev;
-            return [newMsg, ...prev];
+            if (prev.some((n) => n.id === incoming.id)) return prev;
+            return [incoming, ...prev];
           });
         } else {
-          // Chat Message logic
+          // It's a Chat Message
           setRealtimeMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg];
+            if (prev.some((m) => m.id === incoming.id)) return prev;
+            return [...prev, incoming];
           });
 
-          // Real-time 'Jump to Top'
-          const chatType = newMsg.group_id ? 'group' : 'private';
-          const targetIdForMap = newMsg.group_id || newMsg.sender_id;
-          const uniqueIdForMap = `${chatType}_${targetIdForMap}`;
-          setLastActivityMap(prev => ({ ...prev, [uniqueIdForMap]: Date.now() }));
+          const isMe = currentMe && incoming.sender_id === currentMe.id;
 
-          const isMe = currentMe && newMsg.sender_id === currentMe.id;
+          // Real-time 'Jump to Top'
+          const chatType = incoming.group_id ? 'group' : 'private';
+          const targetIdForMap = incoming.group_id || (isMe ? incoming.receiver_id : incoming.sender_id);
+          const uniqueIdForMap = `${chatType}_${targetIdForMap}`;
+          if (targetIdForMap) {
+            setLastActivityMap(prev => ({ ...prev, [uniqueIdForMap]: Date.now() }));
+          }
+
           if (isMe) return;
 
           const isChatRoute = typeof window !== 'undefined' ? window.location.pathname.includes('/chat') : false;
           const isLookingAtChat = isChatRoute && currentActiveChat && (
-              (newMsg.group_id && currentActiveChat.id === newMsg.group_id) || 
-              (!newMsg.group_id && currentActiveChat.id === newMsg.sender_id)
+              (incoming.group_id && currentActiveChat.id === incoming.group_id) || 
+              (!incoming.group_id && currentActiveChat.id === incoming.sender_id)
           );
 
           if (!isLookingAtChat) {
             setHasNewMessage(true);
-            const type = newMsg.group_id ? 'group' : 'private';
-            const targetId = newMsg.group_id || newMsg.sender_id;
+            const type = incoming.group_id ? 'group' : 'private';
+            const targetId = incoming.group_id || incoming.sender_id;
             const uniqueId = `${type}_${targetId}`;
             setUnreadChatIds(prev => Array.from(new Set([...prev, uniqueId])));
-            
-            setRealtimeNotifications((prev) => {
-              if (prev.some((n) => n.id === newMsg.id)) return prev;
-              return [newMsg, ...prev];
-            });
           }
         }
       } catch (err) {

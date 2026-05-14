@@ -56,23 +56,32 @@ func (h *Hub) Run() {
 			}
 
 		case msg := <-h.Broadcast:
-			// 1. Fetch Sender Identity
-			senderName, err := h.Repo.GetUserFullName(msg.SenderID)
-			if err != nil {
-				log.Printf("failed to fetch sender identity: %v", err)
-				senderName = "User"
+			// Default type to "chat" if not specified
+			if msg.Type == "" {
+				msg.Type = "chat"
 			}
-			msg.SenderName = senderName
 
-			// 2. Generate ID and Timestamp BEFORE saving
-			u, _ := uuid.NewV4()
-			msg.ID = u.String()
-			msg.CreatedAt = time.Now().UTC()
+			// Only process chat-specific fields and save to DB if it's a chat message
+			if msg.Type == "chat" {
+				// 1. Fetch Sender Identity
+				senderName, senderAvatar, err := h.Repo.GetUserIdentity(msg.SenderID)
+				if err != nil {
+					log.Printf("failed to fetch sender identity: %v", err)
+					senderName = "User"
+				}
+				msg.SenderName = senderName
+				msg.SenderAvatar = senderAvatar
 
-			// 3. Save to database
-			if err := h.Repo.SaveMessage(msg); err != nil {
-				log.Printf("🔴 failed to save message to database: %v", err)
-				continue
+				// 2. Generate ID and Timestamp BEFORE saving
+				u, _ := uuid.NewV4()
+				msg.ID = u.String()
+				msg.CreatedAt = time.Now().UTC()
+
+				// 3. Save to database
+				if err := h.Repo.SaveMessage(msg); err != nil {
+					log.Printf("🔴 failed to save message to database: %v", err)
+					continue
+				}
 			}
 
 			// 4. Prepare message for broadcasting

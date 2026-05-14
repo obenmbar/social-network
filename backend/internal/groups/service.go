@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"social-network/internal/chat"
 	"social-network/internal/notification"
 
 	"github.com/gofrs/uuid/v5"
@@ -26,10 +27,11 @@ var (
 type Service struct {
 	repo      *Repository
 	notifRepo *notification.Repository
+	hub       *chat.Hub
 }
 
-func NewService(repo *Repository, notifRepo *notification.Repository) *Service {
-	return &Service{repo: repo, notifRepo: notifRepo}
+func NewService(repo *Repository, notifRepo *notification.Repository, hub *chat.Hub) *Service {
+	return &Service{repo: repo, notifRepo: notifRepo, hub: hub}
 }
 
 func (s *Service) CreateGroup(userID string, req CreateGroupRequest) (*Group, error) {
@@ -123,11 +125,19 @@ func (s *Service) InviteUser(userID, groupID string, req InviteRequest) error {
 	// Trigger Notification
 	group, _ := s.repo.GetGroupByID(userID, groupID)
 	if group != nil {
+		content := "You are invited to join group: " + group.Title
 		s.notifRepo.CreateNotification(&notification.Notification{
 			UserID:  inviteeID,
 			Type:    "group_invite",
-			Content: "You are invited to join group: " + group.Title,
+			Content: content,
 		})
+
+		// Real-time broadcast
+		s.hub.Broadcast <- &chat.Message{
+			Type:       "notification",
+			ReceiverID: &inviteeID,
+			Content:    content,
+		}
 	}
 	return nil
 }
@@ -164,11 +174,19 @@ func (s *Service) RequestToJoin(userID, groupID string) error {
 
 	// Trigger Notification to Creator
 	if group != nil {
+		content := "A user has requested to join your group: " + group.Title
 		s.notifRepo.CreateNotification(&notification.Notification{
 			UserID:  group.CreatorID,
 			Type:    "group_request",
-			Content: "A user has requested to join your group: " + group.Title,
+			Content: content,
 		})
+
+		// Real-time broadcast
+		s.hub.Broadcast <- &chat.Message{
+			Type:       "notification",
+			ReceiverID: &group.CreatorID,
+			Content:    content,
+		}
 	}
 	return nil
 }
@@ -202,6 +220,13 @@ func (s *Service) RespondToJoinRequest(userID, groupID, requesterID, status stri
 			Type:    "group_request_response",
 			Content: content,
 		})
+
+		// Real-time broadcast
+		s.hub.Broadcast <- &chat.Message{
+			Type:       "notification",
+			ReceiverID: &requesterID,
+			Content:    content,
+		}
 	}
 	return nil
 }
@@ -326,12 +351,21 @@ func (s *Service) FollowUser(followerID, followedID string) error {
 	}
 
 	// Trigger Notification
+	content := "A user has requested to follow you"
 	s.notifRepo.CreateNotification(&notification.Notification{
 		UserID:   followedID,
 		SourceID: &followerID,
 		Type:     "follow_request",
-		Content:  "A user has requested to follow you",
+		Content:  content,
 	})
+
+	// Real-time broadcast
+	s.hub.Broadcast <- &chat.Message{
+		Type:       "notification",
+		ReceiverID: &followedID,
+		Content:    content,
+	}
+
 	return nil
 }
 
@@ -344,12 +378,21 @@ func (s *Service) AcceptFollowRequest(followerID, followedID string) error {
 	}
 
 	// Trigger Notification to the new follower
+	content := "Your follow request was accepted"
 	s.notifRepo.CreateNotification(&notification.Notification{
 		UserID:   followerID,
 		SourceID: &followedID,
 		Type:     "follow_accept",
-		Content:  "Your follow request was accepted",
+		Content:  content,
 	})
+
+	// Real-time broadcast
+	s.hub.Broadcast <- &chat.Message{
+		Type:       "notification",
+		ReceiverID: &followerID,
+		Content:    content,
+	}
+
 	return nil
 }
 
@@ -416,3 +459,8 @@ func uniqueNicknames(values []string) []string {
 func normalizeNickname(value string) string {
 	return strings.TrimPrefix(strings.TrimSpace(value), "@")
 }
+
+
+
+
+

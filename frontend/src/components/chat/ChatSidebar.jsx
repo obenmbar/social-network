@@ -31,8 +31,14 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
   const sortedUsers = [...users].sort((a, b) => {
     const lastA = lastActivityMap[`private_${a.id}`] || 0;
     const lastB = lastActivityMap[`private_${b.id}`] || 0;
+    
+    // Sort by last activity descending
     if (lastB !== lastA) return lastB - lastA;
-    return (a.nickname || "").localeCompare(b.nickname || "");
+    
+    // Fallback to alphabetical (first name + last name, then nickname)
+    const nameA = `${a.first_name || ""} ${a.last_name || ""}`.trim() || a.nickname || "";
+    const nameB = `${b.first_name || ""} ${b.last_name || ""}`.trim() || b.nickname || "";
+    return nameA.localeCompare(nameB);
   });
 
   return (

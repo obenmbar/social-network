@@ -27,7 +27,8 @@ func (r *Repository) GetPrivateMessages(user1ID, user2ID, cursor string, limit i
 	query := `
 		SELECT m.id, m.sender_id, m.receiver_id, m.group_id, m.content, m.created_at,
 		       u.nickname as sender_nickname,
-		       (u.first_name || ' ' || u.last_name) as sender_name
+		       (u.first_name || ' ' || u.last_name) as sender_name,
+		       u.avatar as sender_avatar
 		FROM messages m
 		JOIN users u ON m.sender_id = u.id
 		WHERE ((m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?))`
@@ -35,7 +36,7 @@ func (r *Repository) GetPrivateMessages(user1ID, user2ID, cursor string, limit i
 	args := []interface{}{user1ID, user2ID, user2ID, user1ID}
 
 	if cursor != "" {
-		query += ` AND m.created_at < ?`
+		query += ` AND m.created_at < (SELECT created_at FROM messages WHERE id = ?)`
 		args = append(args, cursor)
 	}
 
@@ -51,9 +52,13 @@ func (r *Repository) GetPrivateMessages(user1ID, user2ID, cursor string, limit i
 	var messages []Message
 	for rows.Next() {
 		var msg Message
-		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID, &msg.Content, &msg.CreatedAt, &msg.SenderNickname, &msg.SenderName)
+		var avatar sql.NullString
+		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID, &msg.Content, &msg.CreatedAt, &msg.SenderNickname, &msg.SenderName, &avatar)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan message: %w", err)
+		}
+		if avatar.Valid {
+			msg.SenderAvatar = avatar.String
 		}
 		messages = append(messages, msg)
 	}
@@ -70,7 +75,8 @@ func (r *Repository) GetGroupMessages(groupID, cursor string, limit int) ([]Mess
 	query := `
 		SELECT m.id, m.sender_id, m.receiver_id, m.group_id, m.content, m.created_at,
 		       u.nickname as sender_nickname,
-		       (u.first_name || ' ' || u.last_name) as sender_name
+		       (u.first_name || ' ' || u.last_name) as sender_name,
+		       u.avatar as sender_avatar
 		FROM messages m
 		JOIN users u ON m.sender_id = u.id
 		WHERE m.group_id = ?`
@@ -78,7 +84,7 @@ func (r *Repository) GetGroupMessages(groupID, cursor string, limit int) ([]Mess
 	args := []interface{}{groupID}
 
 	if cursor != "" {
-		query += ` AND m.created_at < ?`
+		query += ` AND m.created_at < (SELECT created_at FROM messages WHERE id = ?)`
 		args = append(args, cursor)
 	}
 
@@ -94,9 +100,13 @@ func (r *Repository) GetGroupMessages(groupID, cursor string, limit int) ([]Mess
 	var messages []Message
 	for rows.Next() {
 		var msg Message
-		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID, &msg.Content, &msg.CreatedAt, &msg.SenderNickname, &msg.SenderName)
+		var avatar sql.NullString
+		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID, &msg.Content, &msg.CreatedAt, &msg.SenderNickname, &msg.SenderName, &avatar)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan message: %w", err)
+		}
+		if avatar.Valid {
+			msg.SenderAvatar = avatar.String
 		}
 		messages = append(messages, msg)
 	}
@@ -109,20 +119,27 @@ func (r *Repository) GetGroupMessages(groupID, cursor string, limit int) ([]Mess
 	return messages, nil
 }
 
-func (r *Repository) GetUserFullName(userID string) (string, error) {
+func (r *Repository) GetUserIdentity(userID string) (string, string, error) {
 	var firstName, lastName, email string
-	query := `SELECT first_name, last_name, email FROM users WHERE id = ?`
-	err := r.db.QueryRow(query, userID).Scan(&firstName, &lastName, &email)
+	var avatar sql.NullString
+	query := `SELECT first_name, last_name, email, avatar FROM users WHERE id = ?`
+	err := r.db.QueryRow(query, userID).Scan(&firstName, &lastName, &email, &avatar)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	fullName := strings.TrimSpace(firstName + " " + lastName)
 	if fullName == "" {
 		parts := strings.Split(email, "@")
-		return parts[0], nil
+		fullName = parts[0]
 	}
-	return fullName, nil
+
+	avatarStr := ""
+	if avatar.Valid {
+		avatarStr = avatar.String
+	}
+
+	return fullName, avatarStr, nil
 }
 
 func (r *Repository) GetUserNickname(userID string) (string, error) {
