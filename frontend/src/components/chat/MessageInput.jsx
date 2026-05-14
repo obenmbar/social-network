@@ -1,10 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { useWebSocket } from "@/hooks/useWebSocket";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 export default function MessageInput({ target, onSendMessage }) {
   const [content, setContent] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const { sendMessage } = useWebSocket();
 
   const handleSend = (e) => {
@@ -29,6 +33,7 @@ export default function MessageInput({ target, onSendMessage }) {
     console.log("Attempting to send message:", messageData);
     if (sendMessage(messageData)) {
       setContent("");
+      setShowEmojiPicker(false);
     }
   };
 
@@ -39,8 +44,34 @@ export default function MessageInput({ target, onSendMessage }) {
     }
   };
 
+  const onEmojiClick = (emojiData) => {
+    setContent((prev) => prev + emojiData.emoji);
+  };
+
   return (
     <div style={formStyle}>
+      <div style={emojiPickerContainerStyle}>
+        <button
+          type="button"
+          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+          style={emojiButtonStyle}
+          title="Add emoji"
+        >
+          😀
+        </button>
+        {showEmojiPicker && (
+          <div style={pickerWrapperStyle}>
+            <EmojiPicker
+              onEmojiClick={onEmojiClick}
+              theme="dark"
+              searchDisabled
+              skinTonesDisabled
+              width={300}
+              height={400}
+            />
+          </div>
+        )}
+      </div>
       <input
         type="text"
         value={content}
@@ -49,9 +80,9 @@ export default function MessageInput({ target, onSendMessage }) {
         placeholder="Type a message..."
         style={inputStyle}
       />
-      <button 
-        type="button" 
-        onClick={() => handleSend()} 
+      <button
+        type="button"
+        onClick={() => handleSend()}
         style={buttonStyle}
         disabled={!content.trim()}
       >
@@ -67,6 +98,28 @@ const formStyle = {
   borderTop: "1px solid #333",
   gap: "0.5rem",
   background: "#121212",
+  position: "relative",
+};
+
+const emojiPickerContainerStyle = {
+  display: "flex",
+  alignItems: "center",
+};
+
+const emojiButtonStyle = {
+  background: "none",
+  border: "none",
+  fontSize: "1.2rem",
+  cursor: "pointer",
+  padding: "0 0.5rem",
+};
+
+const pickerWrapperStyle = {
+  position: "absolute",
+  bottom: "100%",
+  left: "10px",
+  marginBottom: "10px",
+  zIndex: 1000,
 };
 
 const inputStyle = {

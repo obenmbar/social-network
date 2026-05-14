@@ -7,7 +7,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnly = false }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { realtimeNotifications, markAsRead, setActiveChat } = useWebSocket();
+  const { unreadChatIds, markAsRead, setActiveChat } = useWebSocket();
 
   useEffect(() => {
     getFollowers()
@@ -15,9 +15,6 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
       .catch((err) => console.error("Failed to load users:", err))
       .finally(() => setLoading(false));
   }, []);
-
-  // Set of user IDs who have unread messages in the current session
-  const unreadUserIds = new Set(realtimeNotifications.filter(m => !m.type).map((m) => m.sender_id));
 
   const sidebarActiveStyle = isSidebarOnly 
     ? { ...sidebarStyle, position: "static", height: "100%", borderLeft: "none", borderRight: "1px solid #333", boxShadow: "none" } 
@@ -39,36 +36,39 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
         <p style={{ padding: "0.5rem 1rem" }}>No followers found.</p>
       ) : (
         <ul style={listStyle}>
-          {users.map((user) => (
-            <li 
-              key={user.id} 
-              style={{
-                ...itemStyle,
-                background: selectedUserId === user.id ? "#2c3e50" : "transparent"
-              }}
-              onClick={() => handleSelect(user)}
-            >
-              <div style={avatarContainer}>
-                {user.avatar ? (
-                  <img src={mediaUrl(user.avatar)} alt="" style={avatarStyle} />
-                ) : (
-                  <div style={placeholderAvatar}>
-                    {user.first_name?.[0] || "?"}
-                  </div>
-                )}
-                {unreadUserIds.has(user.id) && <span style={onlineDot} />}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={nameStyle}>
-                  {user.first_name} {user.last_name}
+          {users.map((user) => {
+            const isUnread = unreadChatIds.includes(user.id);
+            return (
+              <li 
+                key={user.id} 
+                style={{
+                  ...itemStyle,
+                  background: selectedUserId === user.id ? "#2c3e50" : "transparent"
+                }}
+                onClick={() => handleSelect(user)}
+              >
+                <div style={avatarContainer}>
+                  {user.avatar ? (
+                    <img src={mediaUrl(user.avatar)} alt="" style={avatarStyle} />
+                  ) : (
+                    <div style={placeholderAvatar}>
+                      {user.first_name?.[0] || "?"}
+                    </div>
+                  )}
+                  {isUnread && <span style={onlineDot} />}
                 </div>
-                <div style={nicknameStyle}>@{user.nickname || "user"}</div>
-              </div>
-              {unreadUserIds.has(user.id) && (
-                <span style={unreadBadge}>New</span>
-              )}
-            </li>
-          ))}
+                <div style={{ flex: 1 }}>
+                  <div style={nameStyle}>
+                    {user.first_name} {user.last_name}
+                  </div>
+                  <div style={nicknameStyle}>@{user.nickname || "user"}</div>
+                </div>
+                {isUnread && (
+                  <span style={{color: 'red', fontSize: '12px', fontWeight: 'bold'}}>New</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </aside>

@@ -9,7 +9,7 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { realtimeNotifications, markAsRead, setActiveChat } = useWebSocket();
+  const { unreadChatIds, markAsRead, setActiveChat } = useWebSocket();
 
   useEffect(() => {
     setLoading(true);
@@ -24,14 +24,13 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
       .finally(() => setLoading(false));
   }, [activeTab]);
 
-  // Determine which tabs have unread messages using realtimeNotifications
-  const hasPrivateUnread = realtimeNotifications.some(m => !m.type && m.receiver_id && !m.group_id);
-  const hasGroupUnread = realtimeNotifications.some(m => !m.type && m.group_id);
+  // Determine which tabs have unread messages using unreadChatIds
+  const hasPrivateUnread = unreadChatIds.some(id => !groups.some(g => g.id === id));
+  const hasGroupUnread = unreadChatIds.some(id => groups.some(g => g.id === id));
 
   const handleSelect = (target) => {
-    // Step 3 & 4: Clear Local 'New' Badge & Bind markAsRead to Sidebar Click
     markAsRead(target.id);
-    setActiveChat(target); // Ensure active chat guard works in context
+    setActiveChat(target);
     onSelectTarget(target);
   };
 
@@ -46,7 +45,7 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
             color: activeTab === "private" ? "#4dabf5" : "#aaaaaa"
           }}
         >
-          Private {hasPrivateUnread && <span style={dotStyle} />}
+          Private {hasPrivateUnread && <span className="tab-indicator" style={{width: '8px', height: '8px', backgroundColor: 'blue', borderRadius: '50%', display: 'inline-block', marginLeft: '5px'}}></span>}
         </button>
         <button 
           onClick={() => setActiveTab("group")}
@@ -56,7 +55,7 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
             color: activeTab === "group" ? "#4dabf5" : "#aaaaaa"
           }}
         >
-          Groups {hasGroupUnread && <span style={dotStyle} />}
+          Groups {hasGroupUnread && <span className="tab-indicator" style={{width: '8px', height: '8px', backgroundColor: 'blue', borderRadius: '50%', display: 'inline-block', marginLeft: '5px'}}></span>}
         </button>
       </div>
 
@@ -68,14 +67,14 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
             users={users} 
             onSelect={handleSelect} 
             selectedId={selectedTargetId} 
-            notifications={realtimeNotifications}
+            unreadChatIds={unreadChatIds}
           />
         ) : (
           <GroupList 
             groups={groups} 
             onSelect={handleSelect} 
             selectedId={selectedTargetId} 
-            notifications={realtimeNotifications}
+            unreadChatIds={unreadChatIds}
           />
         )}
       </div>
@@ -83,63 +82,64 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
   );
 }
 
-function UserList({ users, onSelect, selectedId, notifications }) {
-  const unreadSenderIds = new Set(notifications.filter(m => !m.type && !m.group_id).map(m => m.sender_id));
-  
+function UserList({ users, onSelect, selectedId, unreadChatIds }) {
   if (users.length === 0) return <p style={infoStyle}>No followers yet.</p>;
 
   return (
     <ul style={listStyle}>
-      {users.map(user => (
-        <li 
-          key={user.id} 
-          onClick={() => onSelect({ ...user, type: "private" })}
-          style={{
-            ...itemStyle,
-            background: selectedId === user.id ? "#2c3e50" : "transparent"
-          }}
-        >
-          <div style={avatarStyle}>
-            {user.avatar ? <img src={mediaUrl(user.avatar)} style={imgStyle} alt="" /> : user.first_name?.[0]}
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={nameStyle}>{user.first_name} {user.last_name}</div>
-            <div style={subStyle}>@{user.nickname || "user"}</div>
-          </div>
-          {unreadSenderIds.has(user.id) && <span style={badgeStyle}>New</span>}
-        </li>
-      ))}
+      {users.map(user => {
+        const isUnread = unreadChatIds.includes(user.id);
+        return (
+          <li 
+            key={user.id} 
+            onClick={() => onSelect({ ...user, type: "private" })}
+            style={{
+              ...itemStyle,
+              background: selectedId === user.id ? "#2c3e50" : "transparent"
+            }}
+          >
+            <div style={avatarStyle}>
+              {user.avatar ? <img src={mediaUrl(user.avatar)} style={imgStyle} alt="" /> : user.first_name?.[0]}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={nameStyle}>{user.first_name} {user.last_name}</div>
+              <div style={subStyle}>@{user.nickname || "user"}</div>
+            </div>
+            {isUnread && <span style={{color: 'red', fontSize: '12px', fontWeight: 'bold'}}>New</span>}
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-function GroupList({ groups, onSelect, selectedId, notifications }) {
-  const unreadGroupIds = new Set(notifications.filter(m => !m.type && m.group_id).map(m => m.group_id));
-
-  // Task 3: Fix Sidebar Group Visibility
+function GroupList({ groups, onSelect, selectedId, unreadChatIds }) {
   const visibleGroups = groups.filter(group => group.is_member);
 
   if (visibleGroups.length === 0) return <p style={infoStyle}>No groups joined.</p>;
 
   return (
     <ul style={listStyle}>
-      {visibleGroups.map(group => (
-        <li 
-          key={group.id} 
-          onClick={() => onSelect({ ...group, type: "group" })}
-          style={{
-            ...itemStyle,
-            background: selectedId === group.id ? "#2c3e50" : "transparent"
-          }}
-        >
-          <div style={{ ...avatarStyle, borderRadius: "8px", background: "#333" }}>G</div>
-          <div style={{ flex: 1 }}>
-            <div style={nameStyle}>{group.title}</div>
-            <div style={subStyle}>{group.description?.substring(0, 30)}...</div>
-          </div>
-          {unreadGroupIds.has(group.id) && <span style={badgeStyle}>New</span>}
-        </li>
-      ))}
+      {visibleGroups.map(group => {
+        const isUnread = unreadChatIds.includes(group.id);
+        return (
+          <li 
+            key={group.id} 
+            onClick={() => onSelect({ ...group, type: "group" })}
+            style={{
+              ...itemStyle,
+              background: selectedId === group.id ? "#2c3e50" : "transparent"
+            }}
+          >
+            <div style={{ ...avatarStyle, borderRadius: "8px", background: "#333" }}>G</div>
+            <div style={{ flex: 1 }}>
+              <div style={nameStyle}>{group.title}</div>
+              <div style={subStyle}>{group.description?.substring(0, 30)}...</div>
+            </div>
+            {isUnread && <span style={{color: 'red', fontSize: '12px', fontWeight: 'bold'}}>New</span>}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -204,14 +204,3 @@ const imgStyle = { width: "100%", height: "100%", objectFit: "cover" };
 const nameStyle = { fontWeight: "600", fontSize: "0.95rem", color: "white" };
 const subStyle = { fontSize: "0.8rem", color: "#aaaaaa" };
 const infoStyle = { padding: "1rem", color: "#aaaaaa", textAlign: "center" };
-
-const dotStyle = { width: "8px", height: "8px", background: "#007bff", borderRadius: "50%" };
-
-const badgeStyle = {
-  background: "#ff4d4f",
-  color: "white",
-  fontSize: "10px",
-  padding: "2px 6px",
-  borderRadius: "10px",
-  fontWeight: "bold",
-};

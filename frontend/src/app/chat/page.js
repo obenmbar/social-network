@@ -24,7 +24,9 @@ export default function ChatPage() {
       .catch(() => {
         router.replace("/login");
       });
-  }, [router]);
+
+    return () => setActiveChat(null);
+  }, [router, setActiveChat]);
 
   if (!mounted) return null;
 

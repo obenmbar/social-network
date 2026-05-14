@@ -11,6 +11,7 @@ export const WebSocketProvider = ({ children }) => {
   const [realtimeMessages, setRealtimeMessages] = useState([]);
   const [realtimeNotifications, setRealtimeNotifications] = useState([]);
   const [hasNewMessage, setHasNewMessage] = useState(false);
+  const [unreadChatIds, setUnreadChatIds] = useState([]);
   const [me, setMe] = useState(null);
   const [activeChat, setActiveChat] = useState(null);
 
@@ -46,6 +47,7 @@ export const WebSocketProvider = ({ children }) => {
   }, []);
 
   const markAsRead = useCallback((targetId) => {
+    setUnreadChatIds(prev => prev.filter(id => id !== targetId));
     setRealtimeNotifications((prev) => {
       const updated = prev.filter(n => 
         n.sender_id !== targetId && n.group_id !== targetId && n.source_id !== targetId
@@ -107,10 +109,19 @@ export const WebSocketProvider = ({ children }) => {
           });
 
           const isMe = currentMe && newMsg.sender_id === currentMe.id;
-          const isViewing = currentActiveChat && (newMsg.group_id === currentActiveChat.id || newMsg.sender_id === currentActiveChat.id);
+          if (isMe) return;
 
-          if (!isMe && !isViewing) {
+          const isChatRoute = typeof window !== 'undefined' ? window.location.pathname.includes('/chat') : false;
+          const isLookingAtChat = isChatRoute && currentActiveChat && (
+              (newMsg.group_id && currentActiveChat.id === newMsg.group_id) || 
+              (!newMsg.group_id && currentActiveChat.id === newMsg.sender_id)
+          );
+
+          if (!isLookingAtChat) {
             setHasNewMessage(true);
+            const targetId = newMsg.group_id || newMsg.sender_id;
+            setUnreadChatIds(prev => Array.from(new Set([...prev, targetId])));
+            
             setRealtimeNotifications((prev) => {
               if (prev.some((n) => n.id === newMsg.id)) return prev;
               return [newMsg, ...prev];
@@ -152,6 +163,7 @@ export const WebSocketProvider = ({ children }) => {
   const value = {
     realtimeMessages,
     realtimeNotifications,
+    unreadChatIds,
     socialNotifications,
     socialUnreadCount,
     hasNewMessage,
