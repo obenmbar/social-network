@@ -26,6 +26,7 @@ var (
 	ErrEmptyComment     = errors.New("comment cannot be empty")
 	ErrInvalidPrivacy   = errors.New("invalid privacy")
 	ErrInvalidImage     = errors.New("invalid image")
+	ErrImageTooLarge    = errors.New("Images must be 10 MB or smaller")
 	ErrPostNotFound     = errors.New("post not found")
 	ErrUnauthorizedPost = errors.New("unauthorized")
 	ErrInvalidSelection = errors.New("selected users must be followers")
@@ -214,7 +215,7 @@ func (s *Service) saveImage(fileHeader *multipart.FileHeader, folder string) (*s
 		return nil, nil
 	}
 	if fileHeader.Size > maxImageSize {
-		return nil, ErrInvalidImage
+		return nil, ErrImageTooLarge
 	}
 
 	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
