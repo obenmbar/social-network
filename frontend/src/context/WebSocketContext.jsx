@@ -10,7 +10,8 @@ export const WebSocketContext = createContext(null);
 export const WebSocketProvider = ({ children }) => {
   const [realtimeMessages, setRealtimeMessages] = useState([]);
   const [realtimeNotifications, setRealtimeNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [hasNewMessage, setHasNewMessage] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0); 
   const [me, setMe] = useState(null);
   const [activeChat, setActiveChat] = useState(null);
 
@@ -35,6 +36,12 @@ export const WebSocketProvider = ({ children }) => {
       const updated = prev.filter(n => 
         n.sender_id !== targetId && n.group_id !== targetId && n.source_id !== targetId
       );
+      
+      const remainingChatNotifs = updated.filter(n => !n.type);
+      if (remainingChatNotifs.length === 0) {
+        setHasNewMessage(false);
+      }
+      
       setUnreadCount(updated.length);
       return updated;
     });
@@ -53,12 +60,10 @@ export const WebSocketProvider = ({ children }) => {
     if (socketRef.current?.readyState === WebSocket.OPEN || socketRef.current?.readyState === WebSocket.CONNECTING) return;
 
     const wsUrl = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8080/ws`;
-    console.log("Connecting to WebSocket:", wsUrl);
     const ws = new WebSocket(wsUrl);
     socketRef.current = ws;
 
     ws.onopen = () => {
-      console.log("🟢 WS Connected");
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
@@ -72,7 +77,6 @@ export const WebSocketProvider = ({ children }) => {
         const currentActiveChat = activeChatRef.current;
 
         if (newMsg.type) {
-          // General Notification logic
           if (currentMe && newMsg.sender_id === currentMe.id) return;
 
           setRealtimeNotifications((prev) => {
@@ -82,7 +86,6 @@ export const WebSocketProvider = ({ children }) => {
             return next;
           });
         } else {
-          // Chat Message logic
           setRealtimeMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
@@ -92,6 +95,7 @@ export const WebSocketProvider = ({ children }) => {
           const isViewing = currentActiveChat && (newMsg.group_id === currentActiveChat.id || newMsg.sender_id === currentActiveChat.id);
 
           if (!isMe && !isViewing) {
+            setHasNewMessage(true);
             setRealtimeNotifications((prev) => {
               if (prev.some((n) => n.id === newMsg.id)) return prev;
               const next = [newMsg, ...prev];
@@ -101,7 +105,7 @@ export const WebSocketProvider = ({ children }) => {
           }
         }
       } catch (err) {
-        console.error("WS error parsing message:", err);
+        console.error("WS error:", err);
       }
     };
 
@@ -113,8 +117,6 @@ export const WebSocketProvider = ({ children }) => {
         }
       }
     };
-
-    ws.onerror = (err) => console.error("WS error:", err);
   }, [pathname]);
 
   const sendMessage = useCallback((message) => {
@@ -135,6 +137,7 @@ export const WebSocketProvider = ({ children }) => {
   const value = {
     realtimeMessages,
     realtimeNotifications,
+    hasNewMessage,
     unreadCount,
     activeChat,
     setActiveChat,

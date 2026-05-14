@@ -5,10 +5,10 @@ import Link from "next/link";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function NavIcons() {
-  const { realtimeMessages, realtimeNotifications } = useWebSocket();
+  const { hasNewMessage, unreadCount } = useWebSocket();
 
-  const msgCount = realtimeMessages.length;
-  const notifCount = realtimeNotifications.length;
+  // unreadCount here represents generic notifications (likes, followers, etc.)
+  // hasNewMessage represents chat specifically.
 
   return (
     <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
@@ -19,8 +19,8 @@ export default function NavIcons() {
         title="Messages"
       >
         <span style={{ fontSize: "24px" }}>💬</span>
-        {msgCount > 0 && (
-          <span style={badgeStyle}>{msgCount}</span>
+        {hasNewMessage && (
+          <div style={dotStyle} />
         )}
       </Link>
 
@@ -31,8 +31,8 @@ export default function NavIcons() {
         title="Notifications"
       >
         <span style={{ fontSize: "24px" }}>🔔</span>
-        {notifCount > 0 && (
-          <span style={badgeStyle}>{notifCount}</span>
+        {unreadCount > 0 && (
+          <span style={badgeStyle}>{unreadCount}</span>
         )}
       </Link>
     </div>
@@ -47,6 +47,17 @@ const containerStyle = {
   justifyContent: "center",
   textDecoration: "none",
   color: "inherit",
+};
+
+const dotStyle = {
+  position: "absolute",
+  top: "0px",
+  right: "0px",
+  background: "#ff4d4f",
+  width: "10px",
+  height: "10px",
+  borderRadius: "50%",
+  border: "2px solid white",
 };
 
 const badgeStyle = {
