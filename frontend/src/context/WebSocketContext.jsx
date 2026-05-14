@@ -12,14 +12,17 @@ export const WebSocketProvider = ({ children }) => {
   const [realtimeNotifications, setRealtimeNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [me, setMe] = useState(null);
-  const [activeChat, setActiveChat] = useState(null); // Step 1: Track the currently open chat
-  
+  const [activeChat, setActiveChat] = useState(null);
+
+  const meRef = useRef(null);
+  const activeChatRef = useRef(null);
+
+  useEffect(() => { meRef.current = me; }, [me]);
+  useEffect(() => { activeChatRef.current = activeChat; }, [activeChat]);
+
   const socketRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
-  const isFirstConnectionAfterLogin = useRef(true);
   const pathname = usePathname();
-  
-  const connectRef = useRef(null);
 
   useEffect(() => {
     if (hasSession()) {
@@ -29,28 +32,17 @@ export const WebSocketProvider = ({ children }) => {
 
   const markAsRead = useCallback((targetId) => {
     setRealtimeNotifications((prev) => {
-      // Step 3: Fix Decrement Logic via markAsRead
-      // Filter out notifications matching the opened chat/group
-      const updatedNotifications = prev.filter(
-        (notif) => {
-          if (!notif.type) {
-            return notif.sender_id !== targetId && notif.group_id !== targetId;
-          }
-          return notif.source_id !== targetId && notif.id !== targetId;
-        }
+      const updated = prev.filter(n => 
+        n.sender_id !== targetId && n.group_id !== targetId && n.source_id !== targetId
       );
-      
-      // Strictly set the global counter to the length of the remaining notifications
-      setUnreadCount(updatedNotifications.length);
-      return updatedNotifications;
+      setUnreadCount(updated.length);
+      return updated;
     });
   }, []);
 
   const connect = useCallback(() => {
     const isAuthPage = pathname === "/login" || pathname === "/register";
-    
     if (!hasSession() || isAuthPage) {
-      isFirstConnectionAfterLogin.current = true;
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
@@ -58,152 +50,85 @@ export const WebSocketProvider = ({ children }) => {
       return;
     }
 
-    if (socketRef.current && (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING)) {
-      return;
-    }
+    if (socketRef.current?.readyState === WebSocket.OPEN || socketRef.current?.readyState === WebSocket.CONNECTING) return;
 
-    const establish = () => {
-      if (!hasSession() || pathname === "/login" || pathname === "/register") return;
-      
-      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsHost = window.location.hostname;
-      const wsUrl = `${wsProtocol}//${wsHost}:8080/ws`;
-      console.log("Connecting to WebSocket:", wsUrl);
-      
-      const ws = new WebSocket(wsUrl);
-      socketRef.current = ws;
+    const wsUrl = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8080/ws`;
+    console.log("Connecting to WebSocket:", wsUrl);
+    const ws = new WebSocket(wsUrl);
+    socketRef.current = ws;
 
-      ws.onopen = () => {
-        console.log("🟢 WS Connected successfully!");
-        if (reconnectTimeoutRef.current) {
-          clearTimeout(reconnectTimeoutRef.current);
-          reconnectTimeoutRef.current = null;
-        }
-      };
+    ws.onopen = () => {
+      console.log("🟢 WS Connected");
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+    };
 
-      ws.onmessage = (event) => {
-        try {
-          const newMsg = JSON.parse(event.data);
-          console.log("📥 WS Message received:", newMsg);
+    ws.onmessage = (event) => {
+      try {
+        const newMsg = JSON.parse(event.data);
+        const currentMe = meRef.current;
+        const currentActiveChat = activeChatRef.current;
 
-          if (newMsg.type) {
-            // Fix Gap 1: Is this my own action?
-            if (me && newMsg.sender_id === me.id) return;
+        if (newMsg.type) {
+          // General Notification logic
+          if (currentMe && newMsg.sender_id === currentMe.id) return;
 
-            // It's a general notification
+          setRealtimeNotifications((prev) => {
+            if (prev.some((n) => n.id === newMsg.id)) return prev;
+            const next = [newMsg, ...prev];
+            setUnreadCount(next.length);
+            return next;
+          });
+        } else {
+          // Chat Message logic
+          setRealtimeMessages((prev) => {
+            if (prev.some((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+
+          const isMe = currentMe && newMsg.sender_id === currentMe.id;
+          const isViewing = currentActiveChat && (newMsg.group_id === currentActiveChat.id || newMsg.sender_id === currentActiveChat.id);
+
+          if (!isMe && !isViewing) {
             setRealtimeNotifications((prev) => {
               if (prev.some((n) => n.id === newMsg.id)) return prev;
               const next = [newMsg, ...prev];
               setUnreadCount(next.length);
               return next;
             });
-          } else {
-            // 1. ALWAYS add to the messages array so the active chat UI updates
-            setRealtimeMessages((prev) => {
-              if (prev.some((m) => m.id === newMsg.id)) return prev;
-              return [...prev, newMsg];
-            });
-
-            // 2. Evaluate Gap 1: Is this my own message?
-            const isSelfMessage = me && newMsg.sender_id === me.id;
-
-            // 3. Evaluate Gap 2: Am I currently looking at this exact chat?
-            const isGroup = !!newMsg.group_id;
-            const isMatchingChat = isGroup 
-              ? activeChat?.type === "group" && activeChat?.id === newMsg.group_id
-              : activeChat?.type === "private" && activeChat?.id === newMsg.sender_id;
-
-            // 4. ONLY update notifications if it's NOT from me AND I'm NOT looking at the chat
-            if (!isSelfMessage && !isMatchingChat) {
-              setRealtimeNotifications((prev) => {
-                if (prev.some((n) => n.id === newMsg.id)) return prev; // Prevent duplicates
-                const next = [newMsg, ...prev];
-                setUnreadCount(next.length);
-                return next;
-              });
-            }
-          }
-        } catch (err) {
-          console.error("Failed to parse WebSocket message:", err);
-        }
-      };
-
-      ws.onclose = (event) => {
-        console.warn("🟠 WS Closed. Code:", event.code, "Reason:", event.reason);
-        socketRef.current = null;
-
-        if (event.code === 4001 || !hasSession()) {
-          setRealtimeMessages([]);
-          setRealtimeNotifications([]);
-          setUnreadCount(0);
-          isFirstConnectionAfterLogin.current = true;
-          return;
-        }
-
-        if (hasSession() && pathname !== "/login" && pathname !== "/register") {
-          if (!reconnectTimeoutRef.current) {
-            reconnectTimeoutRef.current = setTimeout(() => {
-              connectRef.current?.();
-            }, 3000);
           }
         }
-      };
-
-      ws.onerror = (err) => {
-        console.error("🔴 WS Error occurred. Check backend logs for 401/403 or CORS.", err);
-      };
+      } catch (err) {
+        console.error("WS error parsing message:", err);
+      }
     };
 
-    if (isFirstConnectionAfterLogin.current) {
-      isFirstConnectionAfterLogin.current = false;
-      setTimeout(establish, 500);
-    } else {
-      establish();
-    }
-  }, [pathname, me, activeChat]); // Step 2: activeChat added to dependencies
+    ws.onclose = () => {
+      socketRef.current = null;
+      if (hasSession() && pathname !== "/login" && pathname !== "/register") {
+        if (!reconnectTimeoutRef.current) {
+          reconnectTimeoutRef.current = setTimeout(connect, 3000);
+        }
+      }
+    };
 
-  connectRef.current = connect;
+    ws.onerror = (err) => console.error("WS error:", err);
+  }, [pathname]);
 
   const sendMessage = useCallback((message) => {
-    console.log("Attempting to send message via WS:", message);
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(message));
       return true;
     }
-    console.warn("Cannot send message: WebSocket is not open.");
     return false;
   }, []);
 
   useEffect(() => {
     connect();
-
-    const handleStorage = () => {
-      if (hasSession() && !socketRef.current) {
-        connect();
-      }
-    };
-
-    const interval = setInterval(() => {
-      if (hasSession() && !socketRef.current && !reconnectTimeoutRef.current) {
-        connect();
-      }
-    }, 10000);
-
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("focus", handleStorage);
-
     return () => {
-      if (socketRef.current) {
-        socketRef.current.close();
-        socketRef.current = null;
-      }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("focus", handleStorage);
-      clearInterval(interval);
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
     };
   }, [connect]);
 
@@ -215,8 +140,6 @@ export const WebSocketProvider = ({ children }) => {
     setActiveChat,
     sendMessage,
     markAsRead,
-    setRealtimeMessages,
-    setRealtimeNotifications,
     me,
   };
 
