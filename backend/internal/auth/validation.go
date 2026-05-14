@@ -14,17 +14,18 @@ import (
 const maxAvatarBytes = 2 * 1024 * 1024
 
 var (
-	ErrInvalidEmail     = errors.New("email must be valid, 254 characters or less, and start with a letter or digit")
-	ErrInvalidPassword  = errors.New("password must be 8 to 24 ASCII characters")
+	ErrInvalidEmail     = errors.New("email must be valid and start with a letter or digit")
+	ErrInvalidPassword  = errors.New("password must be 8 to 24 characters, including at least 1 letter, 1 number, and 1 symbol (no spaces)")
 	ErrInvalidAvatar    = errors.New("avatar must be a PNG, JPG, JPEG, WEBP, or GIF image under 2MB")
 	ErrInvalidText      = errors.New("text fields cannot contain HTML characters")
 	ErrInvalidAge       = errors.New("age must be between 18 and 70")
-	ErrInvalidFirstName = errors.New("first name must be 2 to 10 characters")
-	ErrInvalidLastName  = errors.New("last name must be 2 to 10 characters")
-	ErrInvalidNickname  = errors.New("nickname must be 2 to 15 characters")
+	ErrInvalidFirstName = errors.New("first name must be 2 to 10 letters (no spaces)")
+	ErrInvalidLastName  = errors.New("last name must be 2 to 10 letters (no spaces)")
+	ErrInvalidNickname  = errors.New("nickname must be 2 to 15 letters (no spaces)")
 	ErrInvalidAboutMe   = errors.New("about me must be 2 to 50 characters")
 
 	emailPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._%+\-]*@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$`)
+	alphaPattern    = regexp.MustCompile(`^[A-Za-z]+$`)
 	avatarDataURLRe = regexp.MustCompile(`^data:image/(png|jpeg|jpg|webp|gif);base64,([A-Za-z0-9+/]+={0,2})$`)
 	htmlUnsafeChars = regexp.MustCompile(`[<>]`)
 	allowedGenders  = map[string]bool{"male": true, "female": true}
@@ -68,13 +69,13 @@ func ValidateRegisterRequest(req RegisterRequest) error {
 	if !isSafeText(req.FirstName) || !isSafeText(req.LastName) || !isSafeOptionalText(req.Nickname) || !isSafeOptionalText(req.AboutMe) {
 		return ErrInvalidText
 	}
-	if len(req.FirstName) < MinNameLen || len(req.FirstName) > MaxNameLen {
+	if !alphaPattern.MatchString(req.FirstName) || len(req.FirstName) < MinNameLen || len(req.FirstName) > MaxNameLen {
 		return ErrInvalidFirstName
 	}
-	if len(req.LastName) < MinNameLen || len(req.LastName) > MaxNameLen {
+	if !alphaPattern.MatchString(req.LastName) || len(req.LastName) < MinNameLen || len(req.LastName) > MaxNameLen {
 		return ErrInvalidLastName
 	}
-	if req.Nickname != nil && (len(*req.Nickname) < MinNicknameLen || len(*req.Nickname) > MaxNicknameLen) {
+	if req.Nickname != nil && (!alphaPattern.MatchString(*req.Nickname) || len(*req.Nickname) < MinNicknameLen || len(*req.Nickname) > MaxNicknameLen) {
 		return ErrInvalidNickname
 	}
 	if req.AboutMe != nil && (len(*req.AboutMe) < MinAboutMeLen || len(*req.AboutMe) > MaxAboutMeLen) {
@@ -107,12 +108,23 @@ func IsValidPassword(password string) bool {
 	if len(password) < 8 || len(password) > 24 {
 		return false
 	}
+	var hasLetter, hasNumber, hasSymbol bool
 	for _, r := range password {
-		if r < 32 || r > 126 {
+		if r == ' ' {
 			return false
 		}
+		if r < 33 || r > 126 {
+			return false
+		}
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			hasLetter = true
+		} else if r >= '0' && r <= '9' {
+			hasNumber = true
+		} else {
+			hasSymbol = true
+		}
 	}
-	return utf8.ValidString(password)
+	return hasLetter && hasNumber && hasSymbol && utf8.ValidString(password)
 }
 
 func IsValidSessionToken(token string) bool {
