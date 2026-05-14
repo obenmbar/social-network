@@ -87,10 +87,10 @@ export const WebSocketProvider = ({ children }) => {
           console.log("📥 WS Message received:", newMsg);
 
           if (newMsg.type) {
-            // Step 2: Fix Self-Increment - Do not notify for the user's own actions
+            // Fix Gap 1: Is this my own action?
             if (me && newMsg.sender_id === me.id) return;
 
-            // It's a notification
+            // It's a general notification
             setRealtimeNotifications((prev) => {
               if (prev.some((n) => n.id === newMsg.id)) return prev;
               const next = [newMsg, ...prev];
@@ -98,28 +98,29 @@ export const WebSocketProvider = ({ children }) => {
               return next;
             });
           } else {
-            // It's a chat message
+            // 1. ALWAYS add to the messages array so the active chat UI updates
             setRealtimeMessages((prev) => {
               if (prev.some((m) => m.id === newMsg.id)) return prev;
               return [...prev, newMsg];
             });
 
-            // Step 2: Active Chat Guard
-            if (me && newMsg.sender_id !== me.id) {
-              const isGroup = !!newMsg.group_id;
-              const isMatchingChat = isGroup 
-                ? activeChat?.type === "group" && activeChat?.id === newMsg.group_id
-                : activeChat?.type === "private" && activeChat?.id === newMsg.sender_id;
+            // 2. Evaluate Gap 1: Is this my own message?
+            const isSelfMessage = me && newMsg.sender_id === me.id;
 
-              if (!isMatchingChat) {
-                // ONLY increment count and add to notifications if we are NOT actively viewing this chat
-                setRealtimeNotifications((prev) => {
-                  if (prev.some((n) => n.id === newMsg.id)) return prev;
-                  const next = [newMsg, ...prev];
-                  setUnreadCount(next.length);
-                  return next;
-                });
-              }
+            // 3. Evaluate Gap 2: Am I currently looking at this exact chat?
+            const isGroup = !!newMsg.group_id;
+            const isMatchingChat = isGroup 
+              ? activeChat?.type === "group" && activeChat?.id === newMsg.group_id
+              : activeChat?.type === "private" && activeChat?.id === newMsg.sender_id;
+
+            // 4. ONLY update notifications if it's NOT from me AND I'm NOT looking at the chat
+            if (!isSelfMessage && !isMatchingChat) {
+              setRealtimeNotifications((prev) => {
+                if (prev.some((n) => n.id === newMsg.id)) return prev; // Prevent duplicates
+                const next = [newMsg, ...prev];
+                setUnreadCount(next.length);
+                return next;
+              });
             }
           }
         } catch (err) {
