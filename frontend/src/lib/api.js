@@ -1,7 +1,7 @@
 import { removeSession } from "./session";
+import { MaxImageSizeBytes, MaxImageSizeMB } from "./limits";
 
 const API_BASE = "/api/path";
-const MAX_IMAGE_SIZE = 10 << 20;
 
 async function fetchAPI(endpoint, method = "GET", body = null) {
   const isFormData = body instanceof FormData;
@@ -232,7 +232,7 @@ export function isUnauthorized(err) {
 }
 
 function validateImageSize(image) {
-  if (image && image.size > MAX_IMAGE_SIZE) {
-    throw new Error("Images must be 10 MB or smaller");
+  if (image && image.size > MaxImageSizeBytes) {
+    throw new Error(`Images must be ${MaxImageSizeMB} MB or smaller`);
   }
 }

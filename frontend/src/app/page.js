@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createComment,
   createPost,
@@ -18,7 +18,14 @@ import {
   respondToFollowRequest,
   unfollowUser,
 } from "@/lib/api";
-import { MaxCommentLen, MaxGroupInviteesLen, MaxPostContentLen, MaxPostTitleLen } from "@/lib/limits";
+import {
+  MaxCommentLen,
+  MaxGroupInviteesLen,
+  MaxImageSizeBytes,
+  MaxImageSizeMB,
+  MaxPostContentLen,
+  MaxPostTitleLen,
+} from "@/lib/limits";
 import styles from "./Feed.module.css";
 
 const privacyOptions = [
@@ -28,9 +35,12 @@ const privacyOptions = [
 ];
 
 const peoplePageSize = 6;
+const commentSubmitDebounceMs = 350;
 
 export default function Feed() {
   const router = useRouter();
+  const commentSubmitTimers = useRef({});
+  const activeCommentSubmissions = useRef(new Set());
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
   const [followers, setFollowers] = useState([]);
@@ -49,6 +59,7 @@ export default function Feed() {
   const [expandedPosts, setExpandedPosts] = useState({});
   const [commentDrafts, setCommentDrafts] = useState({});
   const [commentImages, setCommentImages] = useState({});
+  const [commentErrors, setCommentErrors] = useState({});
   const [postingComments, setPostingComments] = useState({});
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -86,6 +97,14 @@ export default function Feed() {
       isMounted = false;
     };
   }, [router]);
+
+  useEffect(() => {
+    const timers = commentSubmitTimers.current;
+
+    return () => {
+      Object.values(timers).forEach((timer) => window.clearTimeout(timer));
+    };
+  }, []);
 
   const allowedUserIds = useMemo(() => {
     return privacy === "private_selected" ? selectedFollowerIds : [];
@@ -203,16 +222,49 @@ export default function Feed() {
     }
   };
 
-  const handleCreateComment = async (event, postId) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    setError("");
-    setPostingComments((current) => ({ ...current, [postId]: true }));
+  const clearCommentError = (postId) => {
+    setCommentErrors((current) => {
+      if (!current[postId]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[postId];
+      return next;
+    });
+  };
+
+  const handleCommentImageChange = (event, postId) => {
+    const file = event.target.files?.[0] || null;
+    clearCommentError(postId);
+
+    if (file && file.size > MaxImageSizeBytes) {
+      event.target.value = "";
+      setCommentImages((current) => ({ ...current, [postId]: null }));
+      setCommentErrors((current) => ({
+        ...current,
+        [postId]: `Images must be ${MaxImageSizeMB} MB or smaller`,
+      }));
+      return;
+    }
+
+    setCommentImages((current) => ({
+      ...current,
+      [postId]: file,
+    }));
+  };
+
+  const submitComment = async (postId, { content, image, form }) => {
+    if (activeCommentSubmissions.current.has(postId)) {
+      return;
+    }
+
+    activeCommentSubmissions.current.add(postId);
 
     try {
       const comment = await createComment(postId, {
-        content: commentDrafts[postId] || "",
-        image: commentImages[postId] || null,
+        content,
+        image,
       });
 
       setExpandedPosts((current) => ({
@@ -221,12 +273,41 @@ export default function Feed() {
       }));
       setCommentDrafts((current) => ({ ...current, [postId]: "" }));
       setCommentImages((current) => ({ ...current, [postId]: null }));
+      clearCommentError(postId);
       form.reset();
     } catch (err) {
-      setError(err.message || "Could not add comment");
+      setCommentErrors((current) => ({
+        ...current,
+        [postId]: err.message || "Could not add comment",
+      }));
     } finally {
+      activeCommentSubmissions.current.delete(postId);
       setPostingComments((current) => ({ ...current, [postId]: false }));
     }
+  };
+
+  const handleCreateComment = (event, postId) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    setError("");
+    clearCommentError(postId);
+
+    if (activeCommentSubmissions.current.has(postId)) {
+      return;
+    }
+
+    if (commentSubmitTimers.current[postId]) {
+      window.clearTimeout(commentSubmitTimers.current[postId]);
+    }
+
+    const content = commentDrafts[postId] || "";
+    const image = commentImages[postId] || null;
+    setPostingComments((current) => ({ ...current, [postId]: true }));
+
+    commentSubmitTimers.current[postId] = window.setTimeout(() => {
+      delete commentSubmitTimers.current[postId];
+      submitComment(postId, { content, image, form });
+    }, commentSubmitDebounceMs);
   };
 
   const handlePeopleSearch = (event) => {
@@ -485,12 +566,7 @@ export default function Feed() {
                         <input
                           type="file"
                           accept="image/jpeg,image/png,image/gif,image/webp"
-                          onChange={(event) =>
-                            setCommentImages((current) => ({
-                              ...current,
-                              [post.id]: event.target.files?.[0] || null,
-                            }))
-                          }
+                          onChange={(event) => handleCommentImageChange(event, post.id)}
                         />
                       </label>
                       <button type="submit" disabled={postingComments[post.id]}>
@@ -499,6 +575,11 @@ export default function Feed() {
                       {commentImages[post.id] && (
                         <p className={styles.commentFileName}>
                           {commentImages[post.id].name}
+                        </p>
+                      )}
+                      {commentErrors[post.id] && (
+                        <p className={styles.commentErrorMessage} aria-live="polite">
+                          {commentErrors[post.id]}
                         </p>
                       )}
                     </form>

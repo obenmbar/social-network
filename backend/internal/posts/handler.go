@@ -37,7 +37,7 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 	req, fileHeader, err := parseCreatePostRequest(w, r)
 	if err != nil {
 		if isRequestTooLarge(err) {
-			writeJSONError(w, "Request body too large", http.StatusRequestEntityTooLarge)
+			writeJSONError(w, ErrImageTooLarge.Error(), http.StatusRequestEntityTooLarge)
 			return
 		}
 		writeJSONError(w, "Invalid request body", http.StatusBadRequest)
@@ -155,7 +155,7 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	req, fileHeader, err := parseCreateCommentRequest(w, r)
 	if err != nil {
 		if isRequestTooLarge(err) {
-			writeJSONError(w, "Request body too large", http.StatusRequestEntityTooLarge)
+			writeJSONError(w, ErrImageTooLarge.Error(), http.StatusRequestEntityTooLarge)
 			return
 		}
 		writeJSONError(w, "Invalid request body", http.StatusBadRequest)
@@ -264,7 +264,7 @@ func isRequestTooLarge(err error) bool {
 
 func writePostError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, ErrEmptyPost), errors.Is(err, ErrEmptyComment), errors.Is(err, ErrInvalidPrivacy), errors.Is(err, ErrInvalidImage), errors.Is(err, ErrInvalidSelection), errors.Is(err, ErrTextTooLong):
+	case errors.Is(err, ErrEmptyPost), errors.Is(err, ErrEmptyComment), errors.Is(err, ErrInvalidPrivacy), errors.Is(err, ErrInvalidImage), errors.Is(err, ErrImageTooLarge), errors.Is(err, ErrInvalidSelection), errors.Is(err, ErrTextTooLong):
 		writeJSONError(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, ErrPostNotFound):
 		writeJSONError(w, err.Error(), http.StatusNotFound)

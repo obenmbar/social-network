@@ -641,6 +641,14 @@
   overflow-wrap: anywhere;
 }
 
+.commentErrorMessage {
+  grid-column: 1 / -1;
+  margin: -0.15rem 0 0;
+  color: var(--error);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
 .emptyState,
 .emptyComments {
   color: var(--muted-foreground);
