@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { register } from "@/lib/api";
-import { validateAuthFields, validateAvatarFile, validateSafeText, MinNameLen, MaxNameLen, MinNicknameLen, MaxNicknameLen, MinAboutMeLen, MaxAboutMeLen } from "@/lib/authValidation";
+import { validateAuthFields, validateAvatarFile, validateSafeText, MaxEmailLen, MinNameLen, MaxNameLen, MinNicknameLen, MaxNicknameLen, MinAboutMeLen, MaxAboutMeLen } from "@/lib/authValidation";
 import Notification from "@/components/ui/Notification";
 import styles from "./RegisterForm.module.css";
 
@@ -131,6 +131,7 @@ export default function RegisterForm() {
             value={formData.email}
             onChange={handleChange}
             required
+            maxLength={MaxEmailLen}
           />
         </div>
 

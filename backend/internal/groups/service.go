@@ -20,6 +20,18 @@ var (
 	ErrUserRequired  = errors.New("user is required")
 	ErrUserNotFound  = errors.New("user not found")
 	ErrNotFollower   = errors.New("can only invite your followers")
+	ErrTextTooLong   = errors.New("text is too long")
+)
+
+const (
+	maxGroupTitleLen       = 80
+	maxGroupDescriptionLen = 500
+	maxGroupPostLen        = 2000
+	maxGroupCommentLen     = 500
+	maxEventTitleLen       = 80
+	maxEventDescriptionLen = 500
+	maxNicknameLen         = 15
+	maxInvitees            = 20
 )
 
 type Service struct {
@@ -35,6 +47,9 @@ func (s *Service) CreateGroup(userID string, req CreateGroupRequest) (*Group, er
 	req.Description = strings.TrimSpace(req.Description)
 	if req.Title == "" {
 		return nil, ErrEmptyTitle
+	}
+	if len(req.Title) > maxGroupTitleLen || len(req.Description) > maxGroupDescriptionLen || len(req.InviteeNicknames) > maxInvitees {
+		return nil, ErrTextTooLong
 	}
 
 	id, _ := uuid.NewV4()
@@ -107,6 +122,9 @@ func (s *Service) InviteUser(userID, groupID string, req InviteRequest) error {
 	if nickname == "" {
 		return ErrUserRequired
 	}
+	if len(nickname) > maxNicknameLen {
+		return ErrTextTooLong
+	}
 	if err := s.requireMember(groupID, userID); err != nil {
 		return err
 	}
@@ -176,6 +194,9 @@ func (s *Service) CreatePost(userID, groupID string, req CreatePostRequest) (*Gr
 	if req.Content == "" {
 		return nil, ErrEmptyContent
 	}
+	if len(req.Content) > maxGroupPostLen {
+		return nil, ErrTextTooLong
+	}
 	if err := s.requireMember(groupID, userID); err != nil {
 		return nil, err
 	}
@@ -211,6 +232,9 @@ func (s *Service) CreateComment(userID, groupID, postID string, req CreateCommen
 	if req.Content == "" {
 		return nil, ErrEmptyContent
 	}
+	if len(req.Content) > maxGroupCommentLen {
+		return nil, ErrTextTooLong
+	}
 	if err := s.requireMember(groupID, userID); err != nil {
 		return nil, err
 	}
@@ -235,6 +259,9 @@ func (s *Service) CreateEvent(userID, groupID string, req CreateEventRequest) (*
 	req.Description = strings.TrimSpace(req.Description)
 	if req.Title == "" || strings.TrimSpace(req.EventTime) == "" {
 		return nil, ErrEmptyEvent
+	}
+	if len(req.Title) > maxEventTitleLen || len(req.Description) > maxEventDescriptionLen {
+		return nil, ErrTextTooLong
 	}
 	if err := s.requireMember(groupID, userID); err != nil {
 		return nil, err
@@ -299,6 +326,11 @@ func (s *Service) requireMember(groupID, userID string) error {
 }
 
 func (s *Service) userIDsByNicknames(inviterID string, nicknames []string) ([]string, error) {
+	for _, nickname := range nicknames {
+		if len(normalizeNickname(nickname)) > maxNicknameLen {
+			return nil, ErrTextTooLong
+		}
+	}
 	nicknames = uniqueNicknames(nicknames)
 	userIDs := make([]string, 0, len(nicknames))
 	for _, nickname := range nicknames {

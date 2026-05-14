@@ -18,6 +18,15 @@ import {
   respondToGroupInvitation,
   respondToGroupJoinRequest,
 } from "@/lib/api";
+import {
+  MaxCommentLen,
+  MaxEventDescriptionLen,
+  MaxEventTitleLen,
+  MaxGroupDescriptionLen,
+  MaxGroupInviteesLen,
+  MaxGroupPostLen,
+  MaxGroupTitleLen,
+} from "@/lib/limits";
 import styles from "./Groups.module.css";
 
 export default function GroupsPage() {
@@ -135,11 +144,11 @@ export default function GroupsPage() {
   const inviteeNicknames = useMemo(() => parseNicknames(drafts.invitees), [drafts.invitees]);
   const minEventTime = formatDateTimeLocal(new Date());
   const createInviteSuggestions = useMemo(
-    () => getMentionSuggestions(drafts.invitees, followers, true),
+    () => getMentionSuggestions(drafts.invitees, followers, true, parseNicknames(drafts.invitees)),
     [drafts.invitees, followers],
   );
   const memberInviteSuggestions = useMemo(
-    () => getMentionSuggestions(drafts.inviteUser, followers, false),
+    () => getMentionSuggestions(drafts.inviteUser, followers, false, parseNicknames(drafts.inviteUser)),
     [drafts.inviteUser, followers],
   );
 
@@ -369,12 +378,14 @@ export default function GroupsPage() {
               value={drafts.title}
               onChange={(event) => updateDraft("title", event.target.value)}
               placeholder="Title"
+              maxLength={MaxGroupTitleLen}
             />
             <textarea
               value={drafts.description}
               onChange={(event) => updateDraft("description", event.target.value)}
               placeholder="Description"
               rows={3}
+              maxLength={MaxGroupDescriptionLen}
             />
             <div className={styles.suggestField}>
               <input
@@ -383,6 +394,7 @@ export default function GroupsPage() {
                 onBlur={() => setTimeout(() => setActiveInviteField(""), 120)}
                 onChange={(event) => updateDraft("invitees", event.target.value)}
                 placeholder="@nickname, @nickname"
+                maxLength={MaxGroupInviteesLen}
               />
               {activeInviteField === "create" && createInviteSuggestions.length > 0 && (
                 <InviteSuggestions
@@ -461,6 +473,7 @@ export default function GroupsPage() {
                       onChange={(event) => updateDraft("post", event.target.value)}
                       placeholder="Share with this group"
                       rows={3}
+                      maxLength={MaxGroupPostLen}
                     />
                     <button type="submit">Post</button>
                   </form>
@@ -499,6 +512,7 @@ export default function GroupsPage() {
                                   }))
                                 }
                                 placeholder="Write a comment"
+                                maxLength={MaxCommentLen}
                               />
                               <button type="submit">Send</button>
                             </form>
@@ -520,6 +534,7 @@ export default function GroupsPage() {
                         value={drafts.eventTitle}
                         onChange={(event) => updateDraft("eventTitle", event.target.value)}
                         placeholder="Title"
+                        maxLength={MaxEventTitleLen}
                       />
                       <textarea
                         value={drafts.eventDescription}
@@ -528,6 +543,7 @@ export default function GroupsPage() {
                         }
                         placeholder="Description"
                         rows={2}
+                        maxLength={MaxEventDescriptionLen}
                       />
                       <input
                         type="datetime-local"
@@ -581,6 +597,7 @@ export default function GroupsPage() {
                           onBlur={() => setTimeout(() => setActiveInviteField(""), 120)}
                           onChange={(event) => updateDraft("inviteUser", event.target.value)}
                           placeholder="@nickname"
+                          maxLength={MaxGroupInviteesLen}
                         />
                         {activeInviteField === "member" &&
                           memberInviteSuggestions.length > 0 && (
@@ -668,12 +685,14 @@ function normalizeNickname(value) {
   return value.trim().replace(/^@/, "");
 }
 
-function getMentionSuggestions(value, followers, allowCommaList) {
+function getMentionSuggestions(value, followers, allowCommaList, selectedNicknames = []) {
   const mention = getActiveMention(value, allowCommaList);
   if (!mention) return [];
   const query = mention.slice(1).toLowerCase();
+  const selected = new Set(selectedNicknames.map((nickname) => nickname.toLowerCase()));
   return followers
     .filter((user) => Boolean(mentionHandle(user)))
+    .filter((user) => !selected.has(mentionHandle(user).toLowerCase()))
     .filter((user) => {
       if (!query) {
         return true;

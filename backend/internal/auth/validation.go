@@ -14,7 +14,7 @@ import (
 const maxAvatarBytes = 2 * 1024 * 1024
 
 var (
-	ErrInvalidEmail     = errors.New("email must be valid and start with a letter or digit")
+	ErrInvalidEmail     = errors.New("email must be valid, 254 characters or less, and start with a letter or digit")
 	ErrInvalidPassword  = errors.New("password must be 8 to 24 ASCII characters")
 	ErrInvalidAvatar    = errors.New("avatar must be a PNG, JPG, JPEG, WEBP, or GIF image under 2MB")
 	ErrInvalidText      = errors.New("text fields cannot contain HTML characters")
@@ -31,6 +31,7 @@ var (
 )
 
 const (
+	MaxEmailLen    = 254
 	MinNameLen     = 2
 	MaxNameLen     = 10
 	MinNicknameLen = 2
@@ -99,7 +100,7 @@ func ValidateLoginRequest(req LoginRequest) error {
 }
 
 func IsValidEmail(email string) bool {
-	return emailPattern.MatchString(email)
+	return len(email) <= MaxEmailLen && emailPattern.MatchString(email)
 }
 
 func IsValidPassword(password string) bool {

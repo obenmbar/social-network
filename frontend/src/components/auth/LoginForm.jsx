@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
-import { validateAuthFields } from "@/lib/authValidation";
+import { MaxEmailLen, validateAuthFields } from "@/lib/authValidation";
 import { saveSession } from "@/lib/session";
 import Notification from "@/components/ui/Notification";
 import styles from "./LoginForm.module.css";
@@ -65,6 +65,7 @@ export default function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            maxLength={MaxEmailLen}
             placeholder="you@example.com"
           />
         </div>

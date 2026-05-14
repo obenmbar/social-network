@@ -15,6 +15,12 @@ import (
 
 const maxImageSize = 10 << 20
 
+const (
+	maxPostTitleLen   = 120
+	maxPostContentLen = 2000
+	maxCommentLen     = 500
+)
+
 var (
 	ErrEmptyPost        = errors.New("post cannot be empty")
 	ErrEmptyComment     = errors.New("comment cannot be empty")
@@ -23,6 +29,7 @@ var (
 	ErrPostNotFound     = errors.New("post not found")
 	ErrUnauthorizedPost = errors.New("unauthorized")
 	ErrInvalidSelection = errors.New("selected users must be followers")
+	ErrTextTooLong      = errors.New("text is too long")
 )
 
 type Service struct {
@@ -45,6 +52,9 @@ func (s *Service) CreatePost(userID string, req CreatePostRequest, fileHeader *m
 	}
 	if req.Title == "" && req.Content == "" && fileHeader == nil {
 		return nil, ErrEmptyPost
+	}
+	if len(req.Title) > maxPostTitleLen || len(req.Content) > maxPostContentLen {
+		return nil, ErrTextTooLong
 	}
 
 	if req.Privacy == PrivacyPrivateSelected {
@@ -128,6 +138,9 @@ func (s *Service) CreateComment(userID, postID string, req CreateCommentRequest,
 	req.Content = strings.TrimSpace(req.Content)
 	if req.Content == "" && fileHeader == nil {
 		return nil, ErrEmptyComment
+	}
+	if len(req.Content) > maxCommentLen {
+		return nil, ErrTextTooLong
 	}
 
 	canSee, err := s.CanUserSeePost(userID, postID)

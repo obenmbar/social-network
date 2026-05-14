@@ -8,6 +8,7 @@ const allowedAvatarTypes = new Set([
 ]);
 const maxAvatarBytes = 2 * 1024 * 1024;
 
+export const MaxEmailLen = 254;
 export const MinNameLen = 2;
 export const MaxNameLen = 10;
 export const MinNicknameLen = 2;
@@ -16,7 +17,8 @@ export const MinAboutMeLen = 2;
 export const MaxAboutMeLen = 50;
 
 export function isValidEmail(email) {
-  return emailPattern.test(email.trim());
+  const value = email.trim();
+  return value.length <= MaxEmailLen && emailPattern.test(value);
 }
 
 export function isValidPassword(password) {

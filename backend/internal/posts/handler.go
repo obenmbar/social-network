@@ -264,7 +264,7 @@ func isRequestTooLarge(err error) bool {
 
 func writePostError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, ErrEmptyPost), errors.Is(err, ErrEmptyComment), errors.Is(err, ErrInvalidPrivacy), errors.Is(err, ErrInvalidImage), errors.Is(err, ErrInvalidSelection):
+	case errors.Is(err, ErrEmptyPost), errors.Is(err, ErrEmptyComment), errors.Is(err, ErrInvalidPrivacy), errors.Is(err, ErrInvalidImage), errors.Is(err, ErrInvalidSelection), errors.Is(err, ErrTextTooLong):
 		writeJSONError(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, ErrPostNotFound):
 		writeJSONError(w, err.Error(), http.StatusNotFound)

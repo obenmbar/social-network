@@ -1,0 +1,10 @@
+export const MaxEmailLen = 254;
+export const MaxPostTitleLen = 120;
+export const MaxPostContentLen = 2000;
+export const MaxCommentLen = 500;
+export const MaxGroupTitleLen = 80;
+export const MaxGroupDescriptionLen = 500;
+export const MaxGroupInviteesLen = 300;
+export const MaxGroupPostLen = 2000;
+export const MaxEventTitleLen = 80;
+export const MaxEventDescriptionLen = 500;

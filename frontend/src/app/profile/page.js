@@ -4,15 +4,18 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
+  createComment,
   followUser,
   getCurrentUser,
   getFeed,
+  getPost,
   getUserProfile,
   isUnauthorized,
   mediaUrl,
   unfollowUser,
   updateProfileVisibility,
 } from "@/lib/api";
+import { MaxCommentLen } from "@/lib/limits";
 import styles from "./Profile.module.css";
 
 export default function ProfilePage() {
@@ -44,6 +47,9 @@ function ProfileContent({ requestedProfileId }) {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
+  const [expandedPosts, setExpandedPosts] = useState({});
+  const [commentDrafts, setCommentDrafts] = useState({});
+  const [postingComments, setPostingComments] = useState({});
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -89,6 +95,8 @@ function ProfileContent({ requestedProfileId }) {
       setUser(currentUser);
       setProfile(profileData);
       setPosts(profilePosts);
+      setExpandedPosts({});
+      setCommentDrafts({});
     }
 
     return () => {
@@ -149,6 +157,50 @@ function ProfileContent({ requestedProfileId }) {
       setError(err.message || "Could not unfollow user");
     } finally {
       setBusyId("");
+    }
+  };
+
+  const handleToggleComments = async (postId) => {
+    if (expandedPosts[postId]) {
+      setExpandedPosts((current) => {
+        const next = { ...current };
+        delete next[postId];
+        return next;
+      });
+      return;
+    }
+
+    setError("");
+    try {
+      const detail = await getPost(postId);
+      setExpandedPosts((current) => ({
+        ...current,
+        [postId]: detail.comments || [],
+      }));
+    } catch (err) {
+      setError(err.message || "Could not load comments");
+    }
+  };
+
+  const handleCreateComment = async (event, postId) => {
+    event.preventDefault();
+    setError("");
+    setPostingComments((current) => ({ ...current, [postId]: true }));
+
+    try {
+      const comment = await createComment(postId, {
+        content: commentDrafts[postId] || "",
+        image: null,
+      });
+      setExpandedPosts((current) => ({
+        ...current,
+        [postId]: [...(current[postId] || []), comment],
+      }));
+      setCommentDrafts((current) => ({ ...current, [postId]: "" }));
+    } catch (err) {
+      setError(err.message || "Could not add comment");
+    } finally {
+      setPostingComments((current) => ({ ...current, [postId]: false }));
     }
   };
 
@@ -306,6 +358,42 @@ function ProfileContent({ requestedProfileId }) {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img className={styles.postImage} src={mediaUrl(post.image)} alt="" />
                       )}
+                      <div className={styles.postActions}>
+                        <button type="button" onClick={() => handleToggleComments(post.id)}>
+                          {expandedPosts[post.id] ? "Hide comments" : "View comments"}
+                        </button>
+                      </div>
+                      {expandedPosts[post.id] && (
+                        <div className={styles.comments}>
+                          {expandedPosts[post.id].length === 0 ? (
+                            <p className={styles.emptyComments}>No comments yet.</p>
+                          ) : (
+                            expandedPosts[post.id].map((comment) => (
+                              <Comment key={comment.id} comment={comment} />
+                            ))
+                          )}
+                          <form
+                            className={styles.commentForm}
+                            onSubmit={(event) => handleCreateComment(event, post.id)}
+                          >
+                            <input
+                              type="text"
+                              value={commentDrafts[post.id] || ""}
+                              onChange={(event) =>
+                                setCommentDrafts((current) => ({
+                                  ...current,
+                                  [post.id]: event.target.value,
+                                }))
+                              }
+                              placeholder="Write a comment"
+                              maxLength={MaxCommentLen}
+                            />
+                            <button type="submit" disabled={postingComments[post.id]}>
+                              {postingComments[post.id] ? "Sending..." : "Send"}
+                            </button>
+                          </form>
+                        </div>
+                      )}
                     </article>
                   ))}
                 </div>
@@ -370,6 +458,22 @@ function UserRow({ user }) {
         <span>@{mentionHandle(user)}</span>
       </div>
     </Link>
+  );
+}
+
+function Comment({ comment }) {
+  return (
+    <div className={styles.comment}>
+      <MiniAvatar user={comment.author} />
+      <div className={styles.commentBody}>
+        <strong>{displayName(comment.author)}</strong>
+        {comment.content && <p>{comment.content}</p>}
+        {comment.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={mediaUrl(comment.image)} alt="" />
+        )}
+      </div>
+    </div>
   );
 }
 

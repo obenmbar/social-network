@@ -18,6 +18,7 @@ import {
   respondToFollowRequest,
   unfollowUser,
 } from "@/lib/api";
+import { MaxCommentLen, MaxGroupInviteesLen, MaxPostContentLen, MaxPostTitleLen } from "@/lib/limits";
 import styles from "./Feed.module.css";
 
 const privacyOptions = [
@@ -311,7 +312,7 @@ export default function Feed() {
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Post title"
-                maxLength={120}
+                maxLength={MaxPostTitleLen}
               />
               <label className={styles.srOnly} htmlFor="post-content">
                 Post content
@@ -322,6 +323,7 @@ export default function Feed() {
                 onChange={(event) => setContent(event.target.value)}
                 placeholder="What would you like to share?"
                 rows={3}
+                maxLength={MaxPostContentLen}
               />
             </div>
           </div>
@@ -348,6 +350,7 @@ export default function Feed() {
                   onChange={handleMentionInputChange}
                   placeholder="@username"
                   autoComplete="off"
+                  maxLength={MaxGroupInviteesLen}
                 />
               </div>
 
@@ -475,6 +478,7 @@ export default function Feed() {
                           }))
                         }
                         placeholder="Write a comment"
+                        maxLength={MaxCommentLen}
                       />
                       <label className={styles.commentFileButton}>
                         Image
@@ -569,6 +573,7 @@ export default function Feed() {
             value={peopleQuery}
             onChange={handlePeopleSearch}
             placeholder="Search people"
+            maxLength={120}
           />
 
           {isLoading ? (
