@@ -26,6 +26,8 @@ import {
   MaxGroupInviteesLen,
   MaxGroupPostLen,
   MaxGroupTitleLen,
+  MaxImageSizeBytes,
+  MaxImageSizeMB,
 } from "@/lib/limits";
 import styles from "./Groups.module.css";
 
@@ -36,6 +38,10 @@ export default function GroupsPage() {
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [detail, setDetail] = useState(null);
   const [expandedPosts, setExpandedPosts] = useState({});
+  const [createInviteIds, setCreateInviteIds] = useState([]);
+  const [memberInviteId, setMemberInviteId] = useState("");
+  const [postImage, setPostImage] = useState(null);
+  const [commentImages, setCommentImages] = useState({});
   const [drafts, setDrafts] = useState({
     title: "",
     description: "",
@@ -141,15 +147,14 @@ export default function GroupsPage() {
   const selectedGroup = detail?.group;
   const isMember = Boolean(selectedGroup?.is_member);
   const isCreator = Boolean(detail?.requests);
-  const inviteeNicknames = useMemo(() => parseNicknames(drafts.invitees), [drafts.invitees]);
   const minEventTime = formatDateTimeLocal(new Date());
   const createInviteSuggestions = useMemo(
-    () => getMentionSuggestions(drafts.invitees, followers, true, parseNicknames(drafts.invitees)),
-    [drafts.invitees, followers],
+    () => getMentionSuggestions(drafts.invitees, followers, true, createInviteIds),
+    [drafts.invitees, followers, createInviteIds],
   );
   const memberInviteSuggestions = useMemo(
-    () => getMentionSuggestions(drafts.inviteUser, followers, false, parseNicknames(drafts.inviteUser)),
-    [drafts.inviteUser, followers],
+    () => getMentionSuggestions(drafts.inviteUser, followers, false, memberInviteId ? [memberInviteId] : []),
+    [drafts.inviteUser, followers, memberInviteId],
   );
 
   function updateDraft(key, value) {
@@ -168,14 +173,32 @@ export default function GroupsPage() {
     });
   }
 
-  function selectCreateInvite(nickname) {
-    updateDraft("invitees", replaceMentionToken(drafts.invitees, nickname, true));
+  function selectCreateInvite(user) {
+    setCreateInviteIds((current) => (current.includes(user.id) ? current : [...current, user.id]));
+    updateDraft("invitees", replaceMentionToken(drafts.invitees, displayName(user), true));
     setActiveInviteField("create");
   }
 
-  function selectMemberInvite(nickname) {
-    updateDraft("inviteUser", `@${nickname}`);
+  function selectMemberInvite(user) {
+    setMemberInviteId(user.id);
+    updateDraft("inviteUser", displayName(user));
     setActiveInviteField("member");
+  }
+
+  function handleCreateInviteChange(value) {
+    updateDraft("invitees", value);
+    const labels = new Set(
+      value
+        .split(",")
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    setCreateInviteIds((current) =>
+      current.filter((userId) => {
+        const user = followers.find((item) => item.id === userId);
+        return user && labels.has(displayName(user).toLowerCase());
+      }),
+    );
   }
 
   async function handleCreateGroup(event) {
@@ -185,7 +208,7 @@ export default function GroupsPage() {
       const group = await createGroup({
         title: drafts.title,
         description: drafts.description,
-        inviteeNicknames,
+        inviteeUserIds: createInviteIds,
       });
       setDrafts((current) => ({
         ...current,
@@ -193,6 +216,7 @@ export default function GroupsPage() {
         description: "",
         invitees: "",
       }));
+      setCreateInviteIds([]);
       await refreshGroups();
       setSelectedGroupId(group.id);
     } catch (err) {
@@ -235,27 +259,43 @@ export default function GroupsPage() {
 
   async function handleInvite(event) {
     event.preventDefault();
-    const nickname = normalizeNickname(drafts.inviteUser);
-    if (!nickname || !selectedGroupId) return;
+    if (!memberInviteId || !selectedGroupId) return;
     setError("");
     try {
-      await inviteToGroup(selectedGroupId, nickname);
+      await inviteToGroup(selectedGroupId, memberInviteId);
       updateDraft("inviteUser", "");
+      setMemberInviteId("");
     } catch (err) {
       setError(err.message || "Could not invite user");
     }
+  }
+
+  function handleImageChange(event, setter) {
+    const file = event.target.files?.[0] || null;
+    if (file && file.size > MaxImageSizeBytes) {
+      event.target.value = "";
+      setter(null);
+      setError(`Images must be ${MaxImageSizeMB} MB or smaller`);
+      return;
+    }
+    setter(file);
   }
 
   async function handleCreatePost(event) {
     event.preventDefault();
     setError("");
     try {
-      const post = await createGroupPost(selectedGroupId, drafts.post);
+      const post = await createGroupPost(selectedGroupId, {
+        content: drafts.post,
+        image: postImage,
+      });
       setDetail((current) => ({
         ...current,
         posts: [post, ...(current?.posts || [])],
       }));
       updateDraft("post", "");
+      setPostImage(null);
+      event.currentTarget.reset();
     } catch (err) {
       setError(err.message || "Could not create post");
     }
@@ -289,13 +329,18 @@ export default function GroupsPage() {
       const comment = await createGroupComment(
         selectedGroupId,
         postId,
-        commentDrafts[postId] || "",
+        {
+          content: commentDrafts[postId] || "",
+          image: commentImages[postId] || null,
+        },
       );
       setExpandedPosts((current) => ({
         ...current,
         [postId]: [...(current[postId] || []), comment],
       }));
       setCommentDrafts((current) => ({ ...current, [postId]: "" }));
+      setCommentImages((current) => ({ ...current, [postId]: null }));
+      event.currentTarget.reset();
     } catch (err) {
       setError(err.message || "Could not add comment");
     }
@@ -392,8 +437,8 @@ export default function GroupsPage() {
                 value={drafts.invitees}
                 onFocus={() => focusInviteField("create", "invitees")}
                 onBlur={() => setTimeout(() => setActiveInviteField(""), 120)}
-                onChange={(event) => updateDraft("invitees", event.target.value)}
-                placeholder="@nickname, @nickname"
+                onChange={(event) => handleCreateInviteChange(event.target.value)}
+                placeholder="First Last, First Last"
                 maxLength={MaxGroupInviteesLen}
               />
               {activeInviteField === "create" && createInviteSuggestions.length > 0 && (
@@ -475,6 +520,17 @@ export default function GroupsPage() {
                       rows={3}
                       maxLength={MaxGroupPostLen}
                     />
+                    <div className={styles.composerActions}>
+                      <label className={styles.fileButton}>
+                        Image
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          onChange={(event) => handleImageChange(event, setPostImage)}
+                        />
+                      </label>
+                      {postImage && <span className={styles.fileName}>{postImage.name}</span>}
+                    </div>
                     <button type="submit">Post</button>
                   </form>
                   <div className={styles.postList}>
@@ -488,6 +544,10 @@ export default function GroupsPage() {
                           <span>{formatDate(post.created_at)}</span>
                         </header>
                         <p>{post.content}</p>
+                        {post.image && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img className={styles.postImage} src={mediaUrl(post.image)} alt="" />
+                        )}
                         <button type="button" onClick={() => handleToggleComments(post.id)}>
                           {expandedPosts[post.id] ? "Hide comments" : "View comments"}
                         </button>
@@ -499,6 +559,14 @@ export default function GroupsPage() {
                                 <div>
                                   <strong>{displayName(comment.author)}</strong>
                                   <span>{comment.content}</span>
+                                  {comment.image && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      className={styles.commentImage}
+                                      src={mediaUrl(comment.image)}
+                                      alt=""
+                                    />
+                                  )}
                                 </div>
                               </div>
                             ))}
@@ -514,7 +582,25 @@ export default function GroupsPage() {
                                 placeholder="Write a comment"
                                 maxLength={MaxCommentLen}
                               />
+                              <label className={styles.fileButton}>
+                                Image
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/gif,image/webp"
+                                  onChange={(event) =>
+                                    handleImageChange(event, (file) =>
+                                      setCommentImages((current) => ({
+                                        ...current,
+                                        [post.id]: file,
+                                      })),
+                                    )
+                                  }
+                                />
+                              </label>
                               <button type="submit">Send</button>
+                              {commentImages[post.id] && (
+                                <p className={styles.fileName}>{commentImages[post.id].name}</p>
+                              )}
                             </form>
                           </div>
                         )}
@@ -595,8 +681,11 @@ export default function GroupsPage() {
                           value={drafts.inviteUser}
                           onFocus={() => focusInviteField("member", "inviteUser")}
                           onBlur={() => setTimeout(() => setActiveInviteField(""), 120)}
-                          onChange={(event) => updateDraft("inviteUser", event.target.value)}
-                          placeholder="@nickname"
+                          onChange={(event) => {
+                            updateDraft("inviteUser", event.target.value);
+                            setMemberInviteId("");
+                          }}
+                          placeholder="First Last"
                           maxLength={MaxGroupInviteesLen}
                         />
                         {activeInviteField === "member" &&
@@ -652,54 +741,38 @@ export default function GroupsPage() {
 function InviteSuggestions({ users, onSelect }) {
   return (
     <div className={styles.suggestions} role="listbox">
-      {users.map((user) => {
-        const nickname = mentionHandle(user);
-        return (
-          <button
-            key={user.id}
-            type="button"
-            role="option"
-            aria-selected="false"
-            onMouseDown={(event) => {
-              event.preventDefault();
-              onSelect(nickname);
-            }}
-          >
-            <strong>@{nickname}</strong>
-            <span>{displayName(user)}</span>
-          </button>
-        );
-      })}
+      {users.map((user) => (
+        <button
+          key={user.id}
+          type="button"
+          role="option"
+          aria-selected="false"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            onSelect(user);
+          }}
+        >
+          <strong>{displayName(user)}</strong>
+          {user.nickname && <span>@{mentionHandle(user)}</span>}
+        </button>
+      ))}
     </div>
   );
 }
 
-function parseNicknames(value) {
-  return value
-    .split(",")
-    .map(normalizeNickname)
-    .filter(Boolean);
-}
-
-function normalizeNickname(value) {
-  return value.trim().replace(/^@/, "");
-}
-
-function getMentionSuggestions(value, followers, allowCommaList, selectedNicknames = []) {
+function getMentionSuggestions(value, followers, allowCommaList, selectedUserIds = []) {
   const mention = getActiveMention(value, allowCommaList);
-  if (!mention) return [];
-  const query = mention.slice(1).toLowerCase();
-  const selected = new Set(selectedNicknames.map((nickname) => nickname.toLowerCase()));
+  const query = mention.toLowerCase();
+  const selected = new Set(selectedUserIds);
   return followers
-    .filter((user) => Boolean(mentionHandle(user)))
-    .filter((user) => !selected.has(mentionHandle(user).toLowerCase()))
+    .filter((user) => !selected.has(user.id))
     .filter((user) => {
       if (!query) {
         return true;
       }
 
       return (
-        mentionHandle(user).toLowerCase().startsWith(query) ||
+        mentionHandle(user).toLowerCase().includes(query) ||
         displayName(user).toLowerCase().includes(query)
       );
     });
@@ -707,7 +780,7 @@ function getMentionSuggestions(value, followers, allowCommaList, selectedNicknam
 
 function getActiveMention(value, allowCommaList) {
   const token = allowCommaList ? value.split(",").at(-1).trimStart() : value.trimStart();
-  return token.startsWith("@") ? token : "";
+  return token;
 }
 
 function hasActiveMention(value, allowCommaList) {
@@ -716,21 +789,19 @@ function hasActiveMention(value, allowCommaList) {
 
 function appendMentionTrigger(value, allowCommaList) {
   if (!allowCommaList) {
-    return value.trim() ? value : "@";
+    return value;
   }
 
-  if (!value.trim()) {
-    return "@";
-  }
+  if (!value.trim()) return value;
 
-  return value.trimEnd().endsWith(",") ? `${value.trimEnd()} @` : `${value}, @`;
+  return value.trimEnd().endsWith(",") ? `${value.trimEnd()} ` : `${value}, `;
 }
 
-function replaceMentionToken(value, nickname, allowCommaList) {
-  const replacement = `@${nickname}`;
+function replaceMentionToken(value, label, allowCommaList) {
+  const replacement = label;
   if (!allowCommaList) return replacement;
   const parts = value.split(",");
-  parts[parts.length - 1] = ` ${replacement}`;
+  parts[parts.length - 1] = ` ${label}`;
   return `${parts.join(",").trimStart()}, `;
 }
 

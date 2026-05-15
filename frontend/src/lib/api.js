@@ -197,10 +197,11 @@ export async function getGroups() {
   return fetchAPI("/groups");
 }
 
-export async function createGroup({ title, description, inviteeNicknames = [] }) {
+export async function createGroup({ title, description, inviteeUserIds = [], inviteeNicknames = [] }) {
   return fetchAPI("/groups", "POST", {
     title,
     description,
+    invitee_user_ids: inviteeUserIds,
     invitee_nicknames: inviteeNicknames,
   });
 }
@@ -213,8 +214,8 @@ export async function getGroupInvitations() {
   return fetchAPI("/groups/invitations");
 }
 
-export async function inviteToGroup(groupId, nickname) {
-  return fetchAPI(`/groups/${groupId}/invite`, "POST", { nickname });
+export async function inviteToGroup(groupId, userId) {
+  return fetchAPI(`/groups/${groupId}/invite`, "POST", { user_id: userId });
 }
 
 export async function respondToGroupInvitation(groupId, status) {
@@ -229,18 +230,34 @@ export async function respondToGroupJoinRequest(groupId, userId, status) {
   return fetchAPI(`/groups/${groupId}/requests/${userId}/${status}`, "POST");
 }
 
-export async function createGroupPost(groupId, content) {
-  return fetchAPI(`/groups/${groupId}/posts`, "POST", { content });
+export async function createGroupPost(groupId, { content, image }) {
+  validateImageSize(image);
+
+  const formData = new FormData();
+  formData.append("content", content);
+
+  if (image) {
+    formData.append("image", image);
+  }
+
+  return fetchAPI(`/groups/${groupId}/posts`, "POST", formData);
 }
 
 export async function getGroupPost(groupId, postId) {
   return fetchAPI(`/groups/${groupId}/posts/${postId}`);
 }
 
-export async function createGroupComment(groupId, postId, content) {
-  return fetchAPI(`/groups/${groupId}/posts/${postId}/comments`, "POST", {
-    content,
-  });
+export async function createGroupComment(groupId, postId, { content, image }) {
+  validateImageSize(image);
+
+  const formData = new FormData();
+  formData.append("content", content);
+
+  if (image) {
+    formData.append("image", image);
+  }
+
+  return fetchAPI(`/groups/${groupId}/posts/${postId}/comments`, "POST", formData);
 }
 
 export async function createGroupEvent(groupId, { title, description, eventTime }) {

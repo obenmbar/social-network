@@ -3,6 +3,7 @@ package groups
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -111,6 +112,14 @@ func (r *Repository) GetUserIDByNickname(nickname string) (string, error) {
 	return userID, nil
 }
 
+func (r *Repository) UserExists(userID string) (bool, error) {
+	var exists bool
+	if err := r.db.QueryRow(`SELECT EXISTS (SELECT 1 FROM users WHERE id = ?)`, userID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("failed to check user: %w", err)
+	}
+	return exists, nil
+}
+
 func (r *Repository) CreateFollowRequest(followerID, followedID string) error {
 	_, err := r.db.Exec(`INSERT OR IGNORE INTO follow_requests (follower_id, followed_id) VALUES (?, ?)`, followerID, followedID)
 	return err
@@ -135,8 +144,8 @@ func (r *Repository) GetFollowers(userID string) ([]Author, error) {
 		       ) as last_activity
 		FROM followers f
 		JOIN users u ON u.id = f.follower_id
-		WHERE f.followed_id = ? AND u.nickname IS NOT NULL AND TRIM(u.nickname) != ''
-		ORDER BY LOWER(u.nickname) ASC`, userID, userID, userID)
+		WHERE f.followed_id = ?
+		ORDER BY LOWER(TRIM(u.first_name || ' ' || u.last_name)) ASC, LOWER(COALESCE(u.nickname, '')) ASC`, userID, userID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get followers: %w", err)
 	}
@@ -227,7 +236,7 @@ func (r *Repository) RespondToJoinRequest(groupID, requesterID, status string) e
 }
 
 func (r *Repository) CreatePost(post *GroupPost) error {
-	_, err := r.db.Exec(`INSERT INTO group_posts (id, group_id, user_id, content) VALUES (?, ?, ?, ?)`, post.ID, post.GroupID, post.UserID, post.Content)
+	_, err := r.db.Exec(`INSERT INTO group_posts (id, group_id, user_id, content, image) VALUES (?, ?, ?, ?, ?)`, post.ID, post.GroupID, post.UserID, post.Content, post.Image)
 	if err != nil {
 		return fmt.Errorf("failed to create group post: %w", err)
 	}
@@ -236,7 +245,7 @@ func (r *Repository) CreatePost(post *GroupPost) error {
 
 func (r *Repository) GetPostByID(postID string) (*GroupPost, error) {
 	row := r.db.QueryRow(`
-		SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.created_at,
+		SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image, gp.created_at,
 		       u.id, u.first_name, u.last_name, u.nickname, u.avatar
 		FROM group_posts gp
 		JOIN users u ON u.id = gp.user_id
@@ -253,7 +262,7 @@ func (r *Repository) GetPostByID(postID string) (*GroupPost, error) {
 
 func (r *Repository) GetPosts(groupID string) ([]*GroupPost, error) {
 	rows, err := r.db.Query(`
-		SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.created_at,
+		SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image, gp.created_at,
 		       u.id, u.first_name, u.last_name, u.nickname, u.avatar
 		FROM group_posts gp
 		JOIN users u ON u.id = gp.user_id
@@ -276,7 +285,7 @@ func (r *Repository) GetPosts(groupID string) ([]*GroupPost, error) {
 }
 
 func (r *Repository) CreateComment(comment *GroupComment) error {
-	_, err := r.db.Exec(`INSERT INTO group_comments (id, post_id, user_id, content) VALUES (?, ?, ?, ?)`, comment.ID, comment.PostID, comment.UserID, comment.Content)
+	_, err := r.db.Exec(`INSERT INTO group_comments (id, post_id, user_id, content, image) VALUES (?, ?, ?, ?, ?)`, comment.ID, comment.PostID, comment.UserID, comment.Content, comment.Image)
 	if err != nil {
 		return fmt.Errorf("failed to create group comment: %w", err)
 	}
@@ -285,7 +294,7 @@ func (r *Repository) CreateComment(comment *GroupComment) error {
 
 func (r *Repository) GetCommentByID(commentID string) (*GroupComment, error) {
 	row := r.db.QueryRow(`
-		SELECT gc.id, gc.post_id, gc.user_id, gc.content, gc.created_at,
+		SELECT gc.id, gc.post_id, gc.user_id, gc.content, gc.image, gc.created_at,
 		       u.id, u.first_name, u.last_name, u.nickname, u.avatar
 		FROM group_comments gc
 		JOIN users u ON u.id = gc.user_id
@@ -302,7 +311,7 @@ func (r *Repository) GetCommentByID(commentID string) (*GroupComment, error) {
 
 func (r *Repository) GetComments(postID string) ([]*GroupComment, error) {
 	rows, err := r.db.Query(`
-		SELECT gc.id, gc.post_id, gc.user_id, gc.content, gc.created_at,
+		SELECT gc.id, gc.post_id, gc.user_id, gc.content, gc.image, gc.created_at,
 		       u.id, u.first_name, u.last_name, u.nickname, u.avatar
 		FROM group_comments gc
 		JOIN users u ON u.id = gc.user_id
@@ -343,6 +352,9 @@ func (r *Repository) RespondToEvent(eventID, userID, response string) error {
 }
 
 func (r *Repository) GetEvents(groupID, viewerID string) ([]*GroupEvent, error) {
+	if err := r.DeleteExpiredEvents(time.Now()); err != nil {
+		return nil, err
+	}
 	rows, err := r.db.Query(`
 		SELECT ge.id, ge.group_id, ge.creator_id, ge.title, ge.description, ge.event_time, ge.created_at,
 		       u.id, u.first_name, u.last_name, u.nickname, u.avatar,
@@ -374,6 +386,39 @@ func (r *Repository) GetEvents(groupID, viewerID string) ([]*GroupEvent, error) 
 		events = append(events, event)
 	}
 	return events, rows.Err()
+}
+
+func (r *Repository) DeleteExpiredEvents(now time.Time) error {
+	_, err := r.db.Exec(`DELETE FROM group_events WHERE datetime(event_time) <= datetime(?)`, now.UTC().Format(time.RFC3339))
+	if err != nil {
+		return fmt.Errorf("failed to delete expired events: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) GetGroupIDByImagePath(imagePath string) (*string, error) {
+	imagePath = strings.TrimSpace(imagePath)
+	var groupID string
+	err := r.db.QueryRow(`SELECT group_id FROM group_posts WHERE image = ?`, imagePath).Scan(&groupID)
+	if err == nil {
+		return &groupID, nil
+	}
+	if err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to get group post image: %w", err)
+	}
+
+	err = r.db.QueryRow(`
+		SELECT gp.group_id
+		FROM group_comments gc
+		JOIN group_posts gp ON gp.id = gc.post_id
+		WHERE gc.image = ?`, imagePath).Scan(&groupID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get group comment image: %w", err)
+	}
+	return &groupID, nil
 }
 
 func (r *Repository) GetMembers(groupID string) ([]Author, error) {
@@ -487,7 +532,7 @@ func scanGroup(row scanner) (*Group, error) {
 func scanPost(row scanner) (*GroupPost, error) {
 	post := &GroupPost{}
 	if err := row.Scan(
-		&post.ID, &post.GroupID, &post.UserID, &post.Content, &post.CreatedAt,
+		&post.ID, &post.GroupID, &post.UserID, &post.Content, &post.Image, &post.CreatedAt,
 		&post.Author.ID, &post.Author.FirstName, &post.Author.LastName, &post.Author.Nickname, &post.Author.Avatar,
 	); err != nil {
 		return nil, err
@@ -498,7 +543,7 @@ func scanPost(row scanner) (*GroupPost, error) {
 func scanComment(row scanner) (*GroupComment, error) {
 	comment := &GroupComment{}
 	if err := row.Scan(
-		&comment.ID, &comment.PostID, &comment.UserID, &comment.Content, &comment.CreatedAt,
+		&comment.ID, &comment.PostID, &comment.UserID, &comment.Content, &comment.Image, &comment.CreatedAt,
 		&comment.Author.ID, &comment.Author.FirstName, &comment.Author.LastName, &comment.Author.Nickname, &comment.Author.Avatar,
 	); err != nil {
 		return nil, err

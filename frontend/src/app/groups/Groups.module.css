@@ -104,6 +104,7 @@
 
 .stackForm button,
 .composer button,
+.fileButton,
 .inlineForm button,
 .groupHeader button,
 .post button,
@@ -119,6 +120,28 @@
   font: inherit;
   font-size: 0.9rem;
   padding: 0 0.8rem;
+}
+
+.composerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.fileButton {
+  display: inline-flex;
+  align-items: center;
+}
+
+.fileButton input {
+  display: none;
+}
+
+.fileName {
+  color: var(--muted-foreground);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
 }
 
 .suggestions {
@@ -163,6 +186,7 @@
 
 .stackForm button:hover,
 .composer button:hover,
+.fileButton:hover,
 .inlineForm button:hover,
 .groupHeader button:hover,
 .post button:hover,
@@ -233,6 +257,17 @@
   overflow-wrap: anywhere;
 }
 
+.postImage {
+  width: 100%;
+  max-height: 460px;
+  object-fit: cover;
+  display: block;
+  margin: 0.7rem 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--background);
+}
+
 .post button {
   background-color: transparent;
   color: var(--primary);
@@ -263,6 +298,15 @@
 
 .comment span {
   overflow-wrap: anywhere;
+}
+
+.commentImage {
+  width: min(100%, 320px);
+  max-height: 260px;
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .avatar,

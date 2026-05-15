@@ -43,6 +43,7 @@ type GroupPost struct {
 	GroupID   string    `json:"group_id"`
 	UserID    string    `json:"user_id"`
 	Content   string    `json:"content"`
+	Image     *string   `json:"image,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	Author    Author    `json:"author"`
 }
@@ -52,6 +53,7 @@ type GroupComment struct {
 	PostID    string    `json:"post_id"`
 	UserID    string    `json:"user_id"`
 	Content   string    `json:"content"`
+	Image     *string   `json:"image,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	Author    Author    `json:"author"`
 }
@@ -106,11 +108,13 @@ type PostDetail struct {
 type CreateGroupRequest struct {
 	Title            string   `json:"title"`
 	Description      string   `json:"description"`
+	InviteeUserIDs   []string `json:"invitee_user_ids"`
 	InviteeNicknames []string `json:"invitee_nicknames"`
 }
 
 type InviteRequest struct {
 	Nickname string `json:"nickname"`
+	UserID   string `json:"user_id"`
 }
 
 type CreatePostRequest struct {

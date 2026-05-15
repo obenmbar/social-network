@@ -62,7 +62,8 @@ func main() {
 	postsService := posts.NewService(postsRepo, filepath.Join(projectRoot, "uploads"))
 	postsHandler := posts.NewHandler(postsService)
 	groupsRepo := groups.NewRepository(db)
-	groupsService := groups.NewService(groupsRepo, notifRepo, chatHub)
+	groupsService := groups.NewService(groupsRepo, notifRepo, chatHub).WithUploadDir(filepath.Join(projectRoot, "uploads"))
+	groupsService.StartExpiredEventCleanup(time.Minute)
 	groupsHandler := groups.NewHandler(groupsService)
 	followersRepo := followers.NewRepository(db)
 	followersService := followers.NewService(followersRepo, notifRepo).WithHub(chatHub)
@@ -121,6 +122,7 @@ func main() {
 	mux.Handle("POST /notifications/read", sessionAuth(http.HandlerFunc(notifHandler.MarkRead)))
 
 	// Uploaded media
+	mux.Handle("/uploads/groups/", sessionAuth(http.HandlerFunc(groupsHandler.ServeUpload)))
 	mux.Handle("/uploads/", sessionAuth(http.HandlerFunc(postsHandler.ServeUpload)))
 
 	handler := middleware.RequestHeaderSizeMiddleware(16 << 10)(rateLimiter.Middleware()(mux))
