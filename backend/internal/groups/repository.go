@@ -3,6 +3,7 @@ package groups
 import (
 	"database/sql"
 	"fmt"
+	"time"
 )
 
 type Repository struct {
@@ -144,9 +145,11 @@ func (r *Repository) GetFollowers(userID string) ([]Author, error) {
 	followers := []Author{}
 	for rows.Next() {
 		var follower Author
-		if err := rows.Scan(&follower.ID, &follower.FirstName, &follower.LastName, &follower.Nickname, &follower.Avatar, &follower.LastActivity); err != nil {
+		var lastActivity sql.NullString
+		if err := rows.Scan(&follower.ID, &follower.FirstName, &follower.LastName, &follower.Nickname, &follower.Avatar, &lastActivity); err != nil {
 			return nil, fmt.Errorf("failed to scan follower: %w", err)
 		}
+		follower.LastActivity = parseSQLiteTime(lastActivity)
 		followers = append(followers, follower)
 	}
 	if err := rows.Err(); err != nil {
@@ -469,13 +472,15 @@ type scanner interface {
 
 func scanGroup(row scanner) (*Group, error) {
 	group := &Group{}
+	var lastActivity sql.NullString
 	if err := row.Scan(
 		&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.CreatedAt,
 		&group.Creator.ID, &group.Creator.FirstName, &group.Creator.LastName, &group.Creator.Nickname, &group.Creator.Avatar,
-		&group.MemberCount, &group.IsMember, &group.HasRequest, &group.HasInvite, &group.LastActivity,
+		&group.MemberCount, &group.IsMember, &group.HasRequest, &group.HasInvite, &lastActivity,
 	); err != nil {
 		return nil, err
 	}
+	group.LastActivity = parseSQLiteTime(lastActivity)
 	return group, nil
 }
 
@@ -499,4 +504,27 @@ func scanComment(row scanner) (*GroupComment, error) {
 		return nil, err
 	}
 	return comment, nil
+}
+
+func parseSQLiteTime(value sql.NullString) *time.Time {
+	if !value.Valid || value.String == "" {
+		return nil
+	}
+
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05.999999999-07:00",
+		"2006-01-02 15:04:05.999999999Z07:00",
+		"2006-01-02 15:04:05.999999999",
+		"2006-01-02 15:04:05",
+	}
+
+	for _, layout := range layouts {
+		if parsed, err := time.Parse(layout, value.String); err == nil {
+			return &parsed
+		}
+	}
+
+	return nil
 }

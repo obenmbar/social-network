@@ -1,3 +1,6 @@
 *.db
-
+*.db-shm
+*.db-wal
+frontend/.next/
+frontend/node_modules/
 

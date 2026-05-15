@@ -27,7 +27,7 @@ type Hub struct {
 
 func NewHub(repo *Repository) *Hub {
 	return &Hub{
-		Broadcast:  make(chan *Message),
+		Broadcast:  make(chan *Message, 256),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
 		Clients:    make(map[string]map[*Client]bool),

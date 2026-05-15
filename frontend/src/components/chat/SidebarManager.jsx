@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import React, { useState, useEffect } from "react";
-import { getFollowers, getGroups, mediaUrl } from "@/lib/api";
+import { getFollowers, getGroups, isUnauthorized, mediaUrl } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
@@ -33,9 +33,13 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
         if (activeTab === "private") setUsers(data || []);
         else setGroups(data || []);
       })
-      .catch((err) => console.error(`Failed to load ${activeTab}:`, err))
+      .catch((err) => {
+        if (!isUnauthorized(err)) {
+          console.error(`Failed to load ${activeTab}:`, err);
+        }
+      })
       .finally(() => setLoading(false));
-  }, [activeTab]);
+  }, [activeTab, setLastActivityMap]);
 
   // Determine which tabs have unread messages using prefixed unreadChatIds
   const hasPrivateUnread = unreadChatIds.some(id => id.startsWith('private_'));
@@ -49,7 +53,8 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
   };
 
   // Dynamic sorting for users
-  const sortedUsers = [...users].sort((a, b) => {
+  const mutualUsers = users.filter((user) => user.follow_status === "following");
+  const sortedUsers = [...mutualUsers].sort((a, b) => {
     const lastA = lastActivityMap[`private_${a.id}`] || (a.last_activity ? new Date(a.last_activity).getTime() : 0);
     const lastB = lastActivityMap[`private_${b.id}`] || (b.last_activity ? new Date(b.last_activity).getTime() : 0);
     
@@ -124,7 +129,7 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
 }
 
 function UserList({ users, onSelect, selectedId, unreadChatIds }) {
-  if (users.length === 0) return <p style={infoStyle}>No followers yet.</p>;
+  if (users.length === 0) return <p style={infoStyle}>No mutual followers yet.</p>;
 
   return (
     <ul style={listStyle}>

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"social-network/internal/chat"
 	"social-network/internal/notification"
 
 	"github.com/gofrs/uuid/v5"
@@ -21,6 +22,7 @@ var (
 type Service struct {
 	repo      *Repository
 	notifRepo *notification.Repository
+	hub       *chat.Hub
 }
 
 func NewService(repo *Repository, notifRepos ...*notification.Repository) *Service {
@@ -29,6 +31,11 @@ func NewService(repo *Repository, notifRepos ...*notification.Repository) *Servi
 		notifRepo = notifRepos[0]
 	}
 	return &Service{repo: repo, notifRepo: notifRepo}
+}
+
+func (s *Service) WithHub(hub *chat.Hub) *Service {
+	s.hub = hub
+	return s
 }
 
 func (s *Service) ListUsers(viewerID string) ([]UserSummary, error) {
@@ -77,7 +84,11 @@ func (s *Service) Follow(requesterID, targetID string) (FollowResponse, error) {
 		return FollowResponse{}, err
 	}
 	if isPublic {
-		return FollowResponse{Status: StatusFollowing}, s.repo.Follow(requesterID, targetID)
+		if err := s.repo.Follow(requesterID, targetID); err != nil {
+			return FollowResponse{}, err
+		}
+		s.notifyFollow(targetID, requesterID)
+		return FollowResponse{Status: StatusFollowing}, nil
 	}
 
 	id, _ := uuid.NewV4()
@@ -115,18 +126,51 @@ func (s *Service) RespondToRequest(userID, requestID, status string) error {
 	default:
 		return ErrInvalidStatus
 	}
-	if err := s.repo.RespondToRequest(userID, strings.TrimSpace(requestID), status); err != nil {
+	requesterID, err := s.repo.RespondToRequest(userID, strings.TrimSpace(requestID), status)
+	if err != nil {
 		if err == sql.ErrNoRows {
 			return ErrRequestNotFound
 		}
 		return err
 	}
+	if status == RequestAccepted {
+		name, err := s.repo.DisplayName(userID)
+		if err != nil || name == "" {
+			name = "A user"
+		}
+		s.notify(&notification.Notification{
+			UserID:   requesterID,
+			SourceID: &userID,
+			Type:     "follow_accept",
+			Content:  name + " accepted your follow request",
+		})
+	}
 	return nil
+}
+
+func (s *Service) notifyFollow(targetID, followerID string) {
+	name, err := s.repo.DisplayName(followerID)
+	if err != nil || name == "" {
+		name = "A user"
+	}
+	s.notify(&notification.Notification{
+		UserID:   targetID,
+		SourceID: &followerID,
+		Type:     "follow",
+		Content:  name + " has followed you",
+	})
 }
 
 func (s *Service) notify(n *notification.Notification) {
 	if s.notifRepo != nil {
 		_ = s.notifRepo.CreateNotification(n)
+	}
+	if s.hub != nil {
+		s.hub.Broadcast <- &chat.Message{
+			Type:       "notification",
+			ReceiverID: &n.UserID,
+			Content:    n.Content,
+		}
 	}
 }
 

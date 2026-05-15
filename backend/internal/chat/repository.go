@@ -191,3 +191,7 @@ func (r *Repository) IsMutualFollow(user1ID, user2ID string) (bool, error) {
 	err := r.db.QueryRow(query, user1ID, user2ID, user2ID, user1ID).Scan(&count)
 	return count == 2, err
 }
+
+func (r *Repository) CanSendPrivateMessage(senderID, receiverID string) (bool, error) {
+	return r.IsMutualFollow(senderID, receiverID)
+}

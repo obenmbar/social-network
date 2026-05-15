@@ -79,7 +79,6 @@ func (r *Repository) GetVisiblePosts(viewerID string) ([]*Post, error) {
 		   	p.privacy = 'private_selected'
 		   	AND EXISTS (
 		   		SELECT 1 FROM post_allowed_users pau
-		   		JOIN followers f ON f.follower_id = pau.user_id AND f.followed_id = p.user_id
 		   		WHERE pau.post_id = p.id AND pau.user_id = ?
 		   	)
 		   )
@@ -129,7 +128,6 @@ func (r *Repository) CanUserSeePost(viewerID, postID string) (bool, error) {
 			  		p.privacy = 'private_selected'
 			  		AND EXISTS (
 			  			SELECT 1 FROM post_allowed_users pau
-			  			JOIN followers f ON f.follower_id = pau.user_id AND f.followed_id = p.user_id
 			  			WHERE pau.post_id = p.id AND pau.user_id = ?
 			  		)
 			  	)

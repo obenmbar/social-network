@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { getFollowers, mediaUrl } from "@/lib/api";
+import { getFollowers, isUnauthorized, mediaUrl } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnly = false }) {
@@ -12,7 +12,11 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
   useEffect(() => {
     getFollowers()
       .then(setUsers)
-      .catch((err) => console.error("Failed to load users:", err))
+      .catch((err) => {
+        if (!isUnauthorized(err)) {
+          console.error("Failed to load users:", err);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -28,7 +32,8 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
   };
 
   // Dynamic sorting for users
-  const sortedUsers = [...users].sort((a, b) => {
+  const mutualUsers = users.filter((user) => user.follow_status === "following");
+  const sortedUsers = [...mutualUsers].sort((a, b) => {
     const lastA = lastActivityMap[`private_${a.id}`] || (a.last_activity ? new Date(a.last_activity).getTime() : 0);
     const lastB = lastActivityMap[`private_${b.id}`] || (b.last_activity ? new Date(b.last_activity).getTime() : 0);
     
@@ -47,7 +52,7 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
       {loading ? (
         <p style={{ padding: "0.5rem 1rem" }}>Loading...</p>
       ) : sortedUsers.length === 0 ? (
-        <p style={{ padding: "0.5rem 1rem" }}>No followers found.</p>
+        <p style={{ padding: "0.5rem 1rem" }}>No mutual followers found.</p>
       ) : (
         <ul style={listStyle}>
           {sortedUsers.map((user) => {

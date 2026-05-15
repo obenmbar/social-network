@@ -5,6 +5,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { 
   getNotifications, 
+  isUnauthorized,
   markNotificationRead, 
 } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -19,7 +20,9 @@ export default function NotificationsPage() {
       const notifs = await getNotifications();
       setNotifications(notifs || []);
     } catch (err) {
-      console.error("Failed to load notifications data:", err);
+      if (!isUnauthorized(err)) {
+        console.error("Failed to load notifications data:", err);
+      }
     } finally {
       setLoading(false);
     }
@@ -39,7 +42,9 @@ export default function NotificationsPage() {
       
       await markNotificationRead(id);
     } catch (err) {
-      console.error("Failed to mark notification as read:", err);
+      if (!isUnauthorized(err)) {
+        console.error("Failed to mark notification as read:", err);
+      }
     }
   };
 

@@ -15,12 +15,14 @@ export default function AuthNavbar({ user, theme, setTheme }) {
 
   const handleLogout = async () => {
     setIsLoading(true);
+    removeSession();
+    router.replace("/login");
 
     try {
       await logout();
+    } catch {
+      // The local session is already cleared; logout is best-effort server cleanup.
     } finally {
-      removeSession();
-      router.replace("/login");
       setIsLoading(false);
     }
   };

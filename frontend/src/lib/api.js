@@ -1,9 +1,21 @@
-import { removeSession } from "./session";
+import { hasSession, removeSession } from "./session";
 import { MaxImageSizeBytes, MaxImageSizeMB } from "./limits";
 
 const API_BASE = "/api/path";
+const publicEndpoints = new Set(["/login", "/logout", "/register"]);
+const currentUserCacheMs = 3000;
+
+let currentUserCache = null;
+let currentUserCacheAt = 0;
+let currentUserPromise = null;
 
 async function fetchAPI(endpoint, method = "GET", body = null) {
+  if (typeof window !== "undefined" && !publicEndpoints.has(endpoint) && !hasSession()) {
+    const error = new Error("Not logged in");
+    error.status = 401;
+    throw error;
+  }
+
   const isFormData = body instanceof FormData;
   const options = {
     method,
@@ -25,6 +37,7 @@ async function fetchAPI(endpoint, method = "GET", body = null) {
     error.status = res.status;
 
     if (res.status === 401) {
+      clearCurrentUserCache();
       removeSession();
     }
 
@@ -53,6 +66,7 @@ async function getErrorMessage(res) {
 }
 
 export async function login(email, password) {
+  clearCurrentUserCache();
   return fetchAPI("/login", "POST", { email, password });
 }
 
@@ -61,7 +75,25 @@ export async function register(data) {
 }
 
 export async function getCurrentUser() {
-  return fetchAPI("/me");
+  const now = Date.now();
+  if (currentUserCache && now - currentUserCacheAt < currentUserCacheMs) {
+    return currentUserCache;
+  }
+  if (currentUserPromise) {
+    return currentUserPromise;
+  }
+
+  currentUserPromise = fetchAPI("/me")
+    .then((user) => {
+      currentUserCache = user;
+      currentUserCacheAt = Date.now();
+      return user;
+    })
+    .finally(() => {
+      currentUserPromise = null;
+    });
+
+  return currentUserPromise;
 }
 
 export async function getFollowers(userId) {
@@ -111,7 +143,14 @@ export async function declineFollowRequest(requestId) {
 }
 
 export async function logout() {
+  clearCurrentUserCache();
   return fetchAPI("/logout", "POST");
+}
+
+function clearCurrentUserCache() {
+  currentUserCache = null;
+  currentUserCacheAt = 0;
+  currentUserPromise = null;
 }
 
 export async function getFeed() {

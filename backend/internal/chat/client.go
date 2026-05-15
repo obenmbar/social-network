@@ -63,7 +63,7 @@ func (c *Client) ReadPump() {
 				continue // Drop the malicious/unauthorized message
 			}
 		} else if msg.ReceiverID != nil && *msg.ReceiverID != "" {
-			hasPermission, err := c.Hub.Repo.IsMutualFollow(c.UserID, *msg.ReceiverID)
+			hasPermission, err := c.Hub.Repo.CanSendPrivateMessage(c.UserID, *msg.ReceiverID)
 			if err != nil || !hasPermission {
 				log.Printf("Security Alert: User %s attempted to send unauthorized message to %s", c.UserID, *msg.ReceiverID)
 				continue // Drop the malicious/unauthorized message

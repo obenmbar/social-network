@@ -3,6 +3,7 @@ package followers
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -103,6 +104,29 @@ func (r *Repository) UserExists(userID string) (bool, error) {
 	return exists, nil
 }
 
+func (r *Repository) DisplayName(userID string) (string, error) {
+	var firstName, lastName, email string
+	var nickname sql.NullString
+	err := r.db.QueryRow(`SELECT first_name, last_name, email, nickname FROM users WHERE id = ?`, userID).Scan(&firstName, &lastName, &email, &nickname)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "A user", nil
+		}
+		return "", fmt.Errorf("failed to get display name: %w", err)
+	}
+	if nickname.Valid && nickname.String != "" {
+		return "@" + nickname.String, nil
+	}
+	name := strings.TrimSpace(firstName + " " + lastName)
+	if name != "" {
+		return name, nil
+	}
+	if email != "" {
+		return strings.Split(email, "@")[0], nil
+	}
+	return "A user", nil
+}
+
 func (r *Repository) IsFollowing(followerID, followedID string) (bool, error) {
 	var exists bool
 	if err := r.db.QueryRow(`SELECT EXISTS (SELECT 1 FROM followers WHERE follower_id = ? AND followed_id = ?)`, followerID, followedID).Scan(&exists); err != nil {
@@ -164,27 +188,27 @@ func (r *Repository) Unfollow(followerID, followedID string) error {
 	return nil
 }
 
-func (r *Repository) RespondToRequest(targetID, requestID, status string) error {
+func (r *Repository) RespondToRequest(targetID, requestID, status string) (string, error) {
 	tx, err := r.db.Begin()
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return "", fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
 	var requesterID string
 	err = tx.QueryRow(`SELECT requester_id FROM follow_requests WHERE id = ? AND target_id = ? AND status = 'pending'`, requestID, targetID).Scan(&requesterID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if _, err := tx.Exec(`UPDATE follow_requests SET status = ?, updated_at = ? WHERE id = ?`, status, time.Now(), requestID); err != nil {
-		return fmt.Errorf("failed to update follow request: %w", err)
+		return "", fmt.Errorf("failed to update follow request: %w", err)
 	}
 	if status == RequestAccepted {
 		if _, err := tx.Exec(`INSERT OR IGNORE INTO followers (follower_id, followed_id) VALUES (?, ?)`, requesterID, targetID); err != nil {
-			return fmt.Errorf("failed to add follower: %w", err)
+			return "", fmt.Errorf("failed to add follower: %w", err)
 		}
 	}
-	return tx.Commit()
+	return requesterID, tx.Commit()
 }
 
 func (r *Repository) ListPendingRequests(targetID string) ([]FollowRequest, error) {

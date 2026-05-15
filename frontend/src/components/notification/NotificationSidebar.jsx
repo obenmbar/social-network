@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { getNotifications, markNotificationRead, mediaUrl } from "@/lib/api";
+import { getNotifications, isUnauthorized, markNotificationRead, mediaUrl } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function NotificationSidebar() {
@@ -12,7 +12,11 @@ export default function NotificationSidebar() {
   useEffect(() => {
     getNotifications()
       .then(setNotifications)
-      .catch((err) => console.error("Failed to load notifications:", err))
+      .catch((err) => {
+        if (!isUnauthorized(err)) {
+          console.error("Failed to load notifications:", err);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -23,7 +27,9 @@ export default function NotificationSidebar() {
       // Also remove from realtime state if it's there
       setRealtimeNotifications((prev) => prev.filter((n) => n.id !== id));
     } catch (err) {
-      console.error("Failed to mark notification as read:", err);
+      if (!isUnauthorized(err)) {
+        console.error("Failed to mark notification as read:", err);
+      }
     }
   };
 

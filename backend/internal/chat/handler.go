@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 
 	"social-network/internal/middleware"
 
@@ -14,7 +15,16 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for testing
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		parsed, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		host := parsed.Hostname()
+		return host == "localhost" || host == "127.0.0.1" || host == "::1"
 	},
 }
 
@@ -76,13 +86,13 @@ func (h *Handler) GetHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Step 1: Secure the HTTP History Endpoints (Private)
-	hasPermission, err := h.repo.IsMutualFollow(currentUserID, otherUserID)
+	hasPermission, err := h.repo.CanSendPrivateMessage(currentUserID, otherUserID)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	if !hasPermission {
-		http.Error(w, "Forbidden: No follow relationship", http.StatusForbidden)
+		http.Error(w, "Forbidden: Private chat is not allowed", http.StatusForbidden)
 		return
 	}
 

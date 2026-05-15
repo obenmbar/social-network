@@ -31,7 +31,13 @@ export const WebSocketProvider = ({ children }) => {
 
   useEffect(() => {
     if (hasSession()) {
-      getCurrentUser().then(setMe).catch(console.error);
+      getCurrentUser()
+        .then(setMe)
+        .catch((err) => {
+          if (err?.status !== 401) {
+            console.error(err);
+          }
+        });
     }
   }, [pathname]);
 
@@ -74,7 +80,7 @@ export const WebSocketProvider = ({ children }) => {
 
   const connect = useCallback(() => {
     const isAuthPage = pathname === "/login" || pathname === "/register";
-    if (!hasSession() || isAuthPage) {
+    if (!hasSession() || isAuthPage || !me) {
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
@@ -84,8 +90,7 @@ export const WebSocketProvider = ({ children }) => {
 
     if (socketRef.current?.readyState === WebSocket.OPEN || socketRef.current?.readyState === WebSocket.CONNECTING) return;
 
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL ||
-      `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8080/ws`;
+    const wsUrl = buildWebSocketURL(process.env.NEXT_PUBLIC_WS_URL);
     console.log("Connecting to WebSocket:", wsUrl);
     const ws = new WebSocket(wsUrl);
     socketRef.current = ws;
@@ -178,8 +183,8 @@ export const WebSocketProvider = ({ children }) => {
       }
     };
 
-    ws.onerror = (err) => console.error("WS error:", err);
-  }, [pathname]);
+    ws.onerror = (err) => console.error("WS error:", err.type, err.target?.url);
+  }, [pathname, me]);
 
   const sendMessage = useCallback((message) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
@@ -228,3 +233,22 @@ export const WebSocketProvider = ({ children }) => {
     </WebSocketContext.Provider>
   );
 };
+
+function buildWebSocketURL(configuredURL) {
+  const fallback = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8080/ws`;
+  const value = configuredURL || fallback;
+
+  try {
+    const url = new URL(value, window.location.href);
+    if (isLoopbackHost(url.hostname) && isLoopbackHost(window.location.hostname)) {
+      url.hostname = window.location.hostname;
+    }
+    return url.toString();
+  } catch {
+    return fallback;
+  }
+}
+
+function isLoopbackHost(hostname) {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}

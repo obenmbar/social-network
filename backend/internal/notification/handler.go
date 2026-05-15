@@ -55,7 +55,7 @@ func (h *Handler) MarkRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.repo.MarkAsRead(notificationID); err != nil {
+	if err := h.repo.MarkAsRead(notificationID, userID); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

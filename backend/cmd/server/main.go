@@ -65,12 +65,12 @@ func main() {
 	groupsService := groups.NewService(groupsRepo, notifRepo, chatHub)
 	groupsHandler := groups.NewHandler(groupsService)
 	followersRepo := followers.NewRepository(db)
-	followersService := followers.NewService(followersRepo, notifRepo)
+	followersService := followers.NewService(followersRepo, notifRepo).WithHub(chatHub)
 	followersHandler := followers.NewHandler(followersService)
 
 	// Middlewares
 
-	rateLimitRequests := getEnvInt("RATE_LIMIT_REQUESTS", 20)
+	rateLimitRequests := getEnvInt("RATE_LIMIT_REQUESTS", 120)
 	rateLimitWindow := getEnvDuration("RATE_LIMIT_WINDOW", 10*time.Second)
 	rateLimiter := middleware.NewRateLimiter(rateLimitRequests, rateLimitWindow)
 	sessionAuth := middleware.SessionMiddleware(authService)

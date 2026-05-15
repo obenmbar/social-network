@@ -4,7 +4,7 @@
 
 import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from "react";
 import Link from "next/link";
-import { getChatHistory, getGroupChatHistory, getCurrentUser, mediaUrl } from "@/lib/api";
+import { getChatHistory, getGroupChatHistory, getCurrentUser, isUnauthorized, mediaUrl } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import MessageInput from "./MessageInput";
 import styles from "./ChatWindow.module.css";
@@ -28,7 +28,13 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
   const targetId = selectedUser?.id;
 
   useEffect(() => {
-    getCurrentUser().then(setMe).catch(console.error);
+    getCurrentUser()
+      .then(setMe)
+      .catch((err) => {
+        if (!isUnauthorized(err)) {
+          console.error(err);
+        }
+      });
   }, []);
 
   const loadHistory = useCallback(async (cursor = "") => {
@@ -64,7 +70,9 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
         setMessages(newOlderMessages);
       }
     } catch (err) {
-      if (err.status === 403) {
+      if (isUnauthorized(err)) {
+        setMessages([]);
+      } else if (err.status === 403) {
         setAccessDenied(true);
       } else {
         console.error("Failed to load chat history:", err);
@@ -214,7 +222,7 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
                     style={{ flexDirection: isMe ? "row-reverse" : "row" }}
                   >
                     <div className={styles.avatarContainer}>
-                      <Link href={`/profile/${msg.sender_id}`}>
+                      <Link href={`/profile?user_id=${msg.sender_id}`}>
                         <img src={senderAvatar} className={styles.bubbleAvatar} alt="" />
                       </Link>
                     </div>
