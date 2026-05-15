@@ -86,8 +86,9 @@ func (h *Handler) GetHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Step 1: Secure the HTTP History Endpoints (Private)
-	hasPermission, err := h.repo.CanSendPrivateMessage(currentUserID, otherUserID)
+	hasPermission, err := h.repo.CanViewPrivateHistory(currentUserID, otherUserID)
 	if err != nil {
+		log.Printf("failed to check private chat permission: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -99,12 +100,31 @@ func (h *Handler) GetHistory(w http.ResponseWriter, r *http.Request) {
 	cursor := r.URL.Query().Get("cursor")
 	messages, err := h.repo.GetPrivateMessages(currentUserID, otherUserID, cursor, 10)
 	if err != nil {
+		log.Printf("failed to get private chat history: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(messages)
+}
+
+func (h *Handler) GetContacts(w http.ResponseWriter, r *http.Request) {
+	currentUserID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || currentUserID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	contacts, err := h.repo.ListPrivateContacts(currentUserID)
+	if err != nil {
+		log.Printf("failed to get private chat contacts: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(contacts)
 }
 
 func (h *Handler) GetGroupHistory(w http.ResponseWriter, r *http.Request) {
@@ -123,6 +143,7 @@ func (h *Handler) GetGroupHistory(w http.ResponseWriter, r *http.Request) {
 	// Step 1: Secure the HTTP History Endpoints (Group)
 	isMember, err := h.repo.IsGroupMember(currentUserID, groupID)
 	if err != nil {
+		log.Printf("failed to check group chat membership: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -134,6 +155,7 @@ func (h *Handler) GetGroupHistory(w http.ResponseWriter, r *http.Request) {
 	cursor := r.URL.Query().Get("cursor")
 	messages, err := h.repo.GetGroupMessages(groupID, cursor, 10)
 	if err != nil {
+		log.Printf("failed to get group chat history: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

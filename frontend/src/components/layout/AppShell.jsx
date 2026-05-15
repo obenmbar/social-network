@@ -30,7 +30,13 @@ export default function AppShell({ children }) {
   }, [theme]);
 
   useEffect(() => {
-    let isMounted = true;
+    let isActive = true;
+
+    if (!isMounted) {
+      return () => {
+        isActive = false;
+      };
+    }
 
     if (!hasLocalSession) {
       setIsCheckingSession(false);
@@ -38,7 +44,7 @@ export default function AppShell({ children }) {
         router.replace("/login");
       }
       return () => {
-        isMounted = false;
+        isActive = false;
       };
     }
 
@@ -46,20 +52,20 @@ export default function AppShell({ children }) {
       setIsCheckingSession(false);
       router.replace("/");
       return () => {
-        isMounted = false;
+        isActive = false;
       };
     }
 
     setIsCheckingSession(true);
     getCurrentUser()
       .then((data) => {
-        if (isMounted) {
+        if (isActive) {
           setUser(data);
           setIsCheckingSession(false);
         }
       })
       .catch((err) => {
-        if (isMounted) {
+        if (isActive) {
           if (isUnauthorized(err)) {
             setUser(null);
             removeSession();
@@ -71,9 +77,9 @@ export default function AppShell({ children }) {
       });
 
     return () => {
-      isMounted = false;
+      isActive = false;
     };
-  }, [hasLocalSession, isAuthRoute, router]);
+  }, [isMounted, hasLocalSession, isAuthRoute, router]);
 
   useEffect(() => {
     const handleStorage = (event) => {

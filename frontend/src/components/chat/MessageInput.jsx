@@ -16,22 +16,23 @@ export default function MessageInput({ target, onSendMessage }) {
     if (!content.trim()) return;
 
     const isGroup = target?.type === "group";
+    const targetId = isGroup ? target?.id || target?.group_id : target?.id || target?.user_id;
+    if (!targetId) return;
+
     const messageData = {
       content: content.trim(),
     };
 
     if (isGroup) {
-      messageData.group_id = target.id;
+      messageData.group_id = targetId;
     } else {
-      messageData.receiver_id = target.id;
+      messageData.receiver_id = targetId;
     }
 
-    if (onSendMessage) {
-      onSendMessage(messageData);
-    }
-
-    console.log("Attempting to send message:", messageData);
     if (sendMessage(messageData)) {
+      if (onSendMessage) {
+        onSendMessage(messageData);
+      }
       setContent("");
       setShowEmojiPicker(false);
     }
@@ -95,9 +96,9 @@ export default function MessageInput({ target, onSendMessage }) {
 const formStyle = {
   display: "flex",
   padding: "1rem",
-  borderTop: "1px solid #333",
+  borderTop: "1px solid var(--border)",
   gap: "0.5rem",
-  background: "#121212",
+  background: "var(--background)",
   position: "relative",
 };
 
@@ -109,6 +110,7 @@ const emojiPickerContainerStyle = {
 const emojiButtonStyle = {
   background: "none",
   border: "none",
+  color: "var(--foreground)",
   fontSize: "1.2rem",
   cursor: "pointer",
   padding: "0 0.5rem",
@@ -126,16 +128,16 @@ const inputStyle = {
   flex: 1,
   padding: "0.5rem 0.75rem",
   borderRadius: "20px",
-  border: "1px solid #444",
+  border: "1px solid var(--border)",
   outline: "none",
   fontSize: "0.9rem",
-  background: "#1e1e1e",
-  color: "white",
+  background: "var(--surface)",
+  color: "var(--foreground)",
 };
 
 const buttonStyle = {
-  background: "#007bff",
-  color: "white",
+  background: "var(--primary)",
+  color: "var(--text-bubble-me)",
   border: "none",
   borderRadius: "20px",
   padding: "0.5rem 1rem",

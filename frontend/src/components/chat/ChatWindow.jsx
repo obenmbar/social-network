@@ -24,8 +24,8 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
   const isAnchoringRef = useRef(false);
   const isInitialLoadRef = useRef(true);
   
-  const isGroup = selectedUser?.type === "group";
-  const targetId = selectedUser?.id;
+  const isGroup = selectedUser?.type === "group" || Boolean(selectedUser?.group_id);
+  const targetId = isGroup ? selectedUser?.id || selectedUser?.group_id : selectedUser?.id;
 
   useEffect(() => {
     getCurrentUser()
@@ -51,6 +51,7 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
       
       const data = await fetchPromise;
       const newOlderMessages = data || [];
+      setAccessDenied(false);
 
       setHasMoreMessages(newOlderMessages.length >= 10);
 
@@ -144,6 +145,7 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
   const displaySubtitle = isGroup ? "Group Chat" : `@${selectedUser.nickname || "user"}`;
   const myAvatarSrc = me?.avatar ? mediaUrl(me.avatar) : DEFAULT_AVATAR;
   const theirAvatarSrc = selectedUser.avatar ? mediaUrl(selectedUser.avatar) : DEFAULT_AVATAR;
+  const canSendMessage = isGroup || selectedUser.can_message !== false;
 
   return (
     <div className={`${styles.window} ${isFullPage ? styles.windowFullPage : ""}`}>
@@ -172,13 +174,19 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
         {loading && messages.length === 0 ? (
           <div className={styles.loadingContainer}>
             <div className={styles.spinner}></div>
-            <p style={{ marginTop: "10px", color: "#aaaaaa" }}>Loading conversation...</p>
+            <p style={{ marginTop: "10px", color: "var(--muted-foreground)" }}>Loading conversation...</p>
           </div>
         ) : accessDenied ? (
           <div className={styles.emptyChat}>
             <span style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🚫</span>
-            <p style={{ fontWeight: "500" }}>You are not a member of this group</p>
-            <p style={{ fontSize: "0.85rem", color: "#aaaaaa" }}>Join the group to view messages.</p>
+            <p style={{ fontWeight: "500" }}>
+              {isGroup ? "You are not a member of this group" : "You cannot message this user"}
+            </p>
+            <p style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>
+              {isGroup
+                ? "Join the group to view messages."
+                : "One of you needs to follow the other to view messages."}
+            </p>
           </div>
         ) : (
           <>
@@ -189,7 +197,7 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
                 style={{
                   width: "100%",
                   padding: "10px",
-                  background: "var(--bg-selected, #2c3e50)",
+                  background: "var(--bg-selected)",
                   color: "var(--text-main, #ffffff)",
                   border: "none",
                   borderRadius: "4px",
@@ -207,7 +215,7 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
               <div className={styles.emptyChat}>
                 <span style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>💬</span>
                 <p style={{ fontWeight: "500" }}>No messages here yet</p>
-                <p style={{ fontSize: "0.85rem", color: "#aaaaaa" }}>Say hello to start the conversation!</p>
+                <p style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>Say hello to start the conversation!</p>
               </div>
             ) : (
               messages.map((msg) => {
@@ -235,13 +243,13 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
                       <div
                         className={styles.bubble}
                         style={{
-                          background: isMe ? "#007bff" : "#2a2a2a",
-                          color: "#ffffff",
+                          background: isMe ? "var(--bg-bubble-me)" : "var(--bg-bubble-other)",
+                          color: isMe ? "var(--text-bubble-me)" : "var(--text-bubble-other)",
                           borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
                         }}
                       >
                         <div style={{ fontSize: "0.95rem" }}>{msg.content}</div>
-                        <div className={styles.time} style={{ color: isMe ? "rgba(255,255,255,0.7)" : "#aaaaaa" }}>
+                        <div className={styles.time} style={{ color: isMe ? "rgba(255,255,255,0.7)" : "var(--muted-foreground)" }}>
                           {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
@@ -254,11 +262,16 @@ export default function ChatWindow({ selectedUser, onClose, isFullPage = false }
         )}
       </div>
 
-      {!accessDenied && (
+      {!accessDenied && canSendMessage && (
         <MessageInput 
           target={selectedUser} 
           onSendMessage={() => {}}
         />
+      )}
+      {!accessDenied && !canSendMessage && (
+        <div className={styles.readOnlyNotice}>
+          You can read this conversation, but one of you needs to follow the other again to send new messages.
+        </div>
       )}
     </div>
   );

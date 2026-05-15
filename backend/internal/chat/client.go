@@ -3,6 +3,7 @@ package chat
 import (
 	"encoding/json"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -54,15 +55,29 @@ func (c *Client) ReadPump() {
 		// Ensure msg.SenderID is strictly overridden by the secure session's UserID
 		msg.SenderID = c.UserID
 		msg.SenderNickname = c.Nickname
+		msg.Type = "chat"
+		msg.Content = strings.TrimSpace(msg.Content)
+
+		hasGroupTarget := msg.GroupID != nil && strings.TrimSpace(*msg.GroupID) != ""
+		hasPrivateTarget := msg.ReceiverID != nil && strings.TrimSpace(*msg.ReceiverID) != ""
+
+		if msg.Content == "" || hasGroupTarget == hasPrivateTarget {
+			log.Printf("Security Alert: User %s sent invalid chat payload", c.UserID)
+			continue
+		}
 
 		// Step 2: Secure the WebSocket Message Broadcasting (Authorization Checks)
-		if msg.GroupID != nil && *msg.GroupID != "" {
+		if hasGroupTarget {
+			groupID := strings.TrimSpace(*msg.GroupID)
+			msg.GroupID = &groupID
 			isMember, err := c.Hub.Repo.IsGroupMember(c.UserID, *msg.GroupID)
 			if err != nil || !isMember {
 				log.Printf("Security Alert: User %s attempted to send unauthorized group message to %s", c.UserID, *msg.GroupID)
 				continue // Drop the malicious/unauthorized message
 			}
-		} else if msg.ReceiverID != nil && *msg.ReceiverID != "" {
+		} else if hasPrivateTarget {
+			receiverID := strings.TrimSpace(*msg.ReceiverID)
+			msg.ReceiverID = &receiverID
 			hasPermission, err := c.Hub.Repo.CanSendPrivateMessage(c.UserID, *msg.ReceiverID)
 			if err != nil || !hasPermission {
 				log.Printf("Security Alert: User %s attempted to send unauthorized message to %s", c.UserID, *msg.ReceiverID)

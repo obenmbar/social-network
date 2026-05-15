@@ -16,3 +16,14 @@ type Message struct {
 	IsRead         bool      `json:"is_read"`
 	CreatedAt      time.Time `json:"created_at"`
 }
+
+type PrivateContact struct {
+	ID           string     `json:"id"`
+	FirstName    string     `json:"first_name"`
+	LastName     string     `json:"last_name"`
+	Nickname     string     `json:"nickname,omitempty"`
+	Avatar       string     `json:"avatar,omitempty"`
+	FollowStatus string     `json:"follow_status"`
+	CanMessage   bool       `json:"can_message"`
+	LastActivity *time.Time `json:"last_activity,omitempty"`
+}

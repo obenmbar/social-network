@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { getFollowers, isUnauthorized, mediaUrl } from "@/lib/api";
+import { getChatContacts, getFollowers, getFollowing, isUnauthorized, mediaUrl } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnly = false }) {
@@ -10,7 +10,7 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
   const { unreadChatIds, lastActivityMap, markAsRead, setActiveChat } = useWebSocket();
 
   useEffect(() => {
-    getFollowers()
+    getPrivateContacts()
       .then(setUsers)
       .catch((err) => {
         if (!isUnauthorized(err)) {
@@ -21,19 +21,19 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
   }, []);
 
   const sidebarActiveStyle = isSidebarOnly 
-    ? { ...sidebarStyle, position: "static", height: "100%", borderLeft: "none", borderRight: "1px solid #333", boxShadow: "none" } 
+    ? { ...sidebarStyle, position: "static", height: "100%", borderLeft: "none", borderRight: "1px solid var(--border)", boxShadow: "none" } 
     : sidebarStyle;
 
   const handleSelect = (user) => {
+    const selectedUser = { ...user, type: "private" };
     // Step 3 & 4: Clear Local 'New' Badge & Bind markAsRead to Sidebar Click
-    markAsRead(user.id, "private");
-    setActiveChat({ ...user, type: "private" }); // Ensure active chat guard works
-    onSelectUser(user);
+    markAsRead(selectedUser.id, "private");
+    setActiveChat(selectedUser); // Ensure active chat guard works
+    onSelectUser(selectedUser);
   };
 
   // Dynamic sorting for users
-  const mutualUsers = users.filter((user) => user.follow_status === "following");
-  const sortedUsers = [...mutualUsers].sort((a, b) => {
+  const sortedUsers = [...users].sort((a, b) => {
     const lastA = lastActivityMap[`private_${a.id}`] || (a.last_activity ? new Date(a.last_activity).getTime() : 0);
     const lastB = lastActivityMap[`private_${b.id}`] || (b.last_activity ? new Date(b.last_activity).getTime() : 0);
     
@@ -52,7 +52,7 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
       {loading ? (
         <p style={{ padding: "0.5rem 1rem" }}>Loading...</p>
       ) : sortedUsers.length === 0 ? (
-        <p style={{ padding: "0.5rem 1rem" }}>No mutual followers found.</p>
+        <p style={{ padding: "0.5rem 1rem" }}>No conversations found.</p>
       ) : (
         <ul style={listStyle}>
           {sortedUsers.map((user) => {
@@ -62,7 +62,7 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
                 key={user.id} 
                 style={{
                   ...itemStyle,
-                  background: selectedUserId === user.id ? "#2c3e50" : "transparent"
+                  background: selectedUserId === user.id ? "var(--bg-selected)" : "transparent"
                 }}
                 onClick={() => handleSelect(user)}
               >
@@ -80,10 +80,13 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
                   <div style={nameStyle}>
                     {user.first_name} {user.last_name}
                   </div>
-                  <div style={nicknameStyle}>@{user.nickname || "user"}</div>
+                  <div style={nicknameStyle}>
+                    @{user.nickname || "user"}
+                    {user.can_message === false ? " · read only" : ""}
+                  </div>
                 </div>
                 {isUnread && (
-                  <span style={{color: 'red', fontSize: '12px', fontWeight: 'bold'}}>New</span>
+                  <span style={newBadgeStyle}>New</span>
                 )}
               </li>
             );
@@ -94,14 +97,37 @@ export default function ChatSidebar({ onSelectUser, selectedUserId, isSidebarOnl
   );
 }
 
+async function getPrivateContacts() {
+  try {
+    return await getChatContacts();
+  } catch (err) {
+    if (err?.status !== 404) {
+      throw err;
+    }
+    const [followers = [], following = []] = await Promise.all([getFollowers(), getFollowing()]);
+    return mergeChatUsers(followers, following);
+  }
+}
+
+function mergeChatUsers(followers, following) {
+  const usersById = new Map();
+
+  [...followers, ...following].forEach((user) => {
+    if (!user?.id || usersById.has(user.id)) return;
+    usersById.set(user.id, { ...user, can_message: true });
+  });
+
+  return Array.from(usersById.values());
+}
+
 const sidebarStyle = {
   position: "fixed",
   right: 0,
   top: "60px", 
   width: "300px",
   height: "calc(100vh - 60px)",
-  background: "#121212",
-  borderLeft: "1px solid #333",
+  background: "var(--background)",
+  borderLeft: "1px solid var(--border)",
   boxShadow: "-2px 0 5px rgba(0,0,0,0.05)",
   zIndex: 1000,
   overflowY: "auto",
@@ -110,9 +136,9 @@ const sidebarStyle = {
 const headerStyle = {
   padding: "1rem",
   margin: 0,
-  borderBottom: "1px solid #333",
+  borderBottom: "1px solid var(--border)",
   fontSize: "1.1rem",
-  color: "white",
+  color: "var(--foreground)",
 };
 
 const listStyle = {
@@ -125,10 +151,10 @@ const itemStyle = {
   display: "flex",
   alignItems: "center",
   padding: "0.75rem 1rem",
-  borderBottom: "1px solid #333",
+  borderBottom: "1px solid var(--border)",
   cursor: "pointer",
   transition: "background 0.2s",
-  color: "white",
+  color: "var(--foreground)",
 };
 
 const avatarContainer = {
@@ -147,12 +173,12 @@ const placeholderAvatar = {
   width: "40px",
   height: "40px",
   borderRadius: "50%",
-  background: "#333",
+  background: "var(--border)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   fontWeight: "bold",
-  color: "#888",
+  color: "var(--muted-foreground)",
 };
 
 const onlineDot = {
@@ -163,7 +189,7 @@ const onlineDot = {
   height: "10px",
   borderRadius: "50%",
   background: "#4caf50",
-  border: "2px solid white",
+  border: "2px solid var(--background)",
 };
 
 const nameStyle = {
@@ -173,14 +199,16 @@ const nameStyle = {
 
 const nicknameStyle = {
   fontSize: "0.85rem",
-  color: "#aaaaaa",
+  color: "var(--muted-foreground)",
 };
 
 const unreadBadge = {
   background: "#ff4d4f",
-  color: "white",
+  color: "var(--text-bubble-me)",
   fontSize: "10px",
   padding: "2px 6px",
   borderRadius: "10px",
   fontWeight: "bold",
 };
+
+const newBadgeStyle = { color: "var(--error)", fontSize: "12px", fontWeight: "bold" };

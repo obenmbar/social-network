@@ -278,6 +278,10 @@ export async function getNotifications() {
   return fetchAPI("/notifications");
 }
 
+export async function getChatContacts() {
+  return fetchAPI("/chat/contacts");
+}
+
 export async function getChatHistory(userId, cursor = "") {
   const params = new URLSearchParams({ user_id: userId });
   if (cursor) {

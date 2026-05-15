@@ -113,6 +113,7 @@ func main() {
 
 	// Chat routes
 	mux.Handle("GET /ws", sessionAuth(http.HandlerFunc(chatWSHandler.ServeWS)))
+	mux.Handle("GET /chat/contacts", sessionAuth(http.HandlerFunc(chatWSHandler.GetContacts)))
 	mux.Handle("GET /chat/history", sessionAuth(http.HandlerFunc(chatWSHandler.GetHistory)))
 	mux.Handle("GET /chat/group/history", sessionAuth(http.HandlerFunc(chatWSHandler.GetGroupHistory)))
 

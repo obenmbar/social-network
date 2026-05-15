@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import React, { useState, useEffect } from "react";
-import { getFollowers, getGroups, isUnauthorized, mediaUrl } from "@/lib/api";
+import { getChatContacts, getFollowers, getFollowing, getGroups, isUnauthorized, mediaUrl } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
@@ -15,7 +15,7 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
 
   useEffect(() => {
     setLoading(true);
-    const fetchData = activeTab === "private" ? getFollowers() : getGroups();
+    const fetchData = activeTab === "private" ? getPrivateContacts() : getGroups();
     
     fetchData
       .then((data) => {
@@ -47,14 +47,14 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
 
   const handleSelect = (target) => {
     const type = target.type || (target.group_id ? 'group' : 'private');
-    markAsRead(target.id, type);
-    setActiveChat(target);
-    onSelectTarget(target);
+    const normalizedTarget = { ...target, type };
+    markAsRead(normalizedTarget.id, type);
+    setActiveChat(normalizedTarget);
+    onSelectTarget(normalizedTarget);
   };
 
   // Dynamic sorting for users
-  const mutualUsers = users.filter((user) => user.follow_status === "following");
-  const sortedUsers = [...mutualUsers].sort((a, b) => {
+  const sortedUsers = [...users].sort((a, b) => {
     const lastA = lastActivityMap[`private_${a.id}`] || (a.last_activity ? new Date(a.last_activity).getTime() : 0);
     const lastB = lastActivityMap[`private_${b.id}`] || (b.last_activity ? new Date(b.last_activity).getTime() : 0);
     
@@ -87,21 +87,21 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
           onClick={() => setActiveTab("private")}
           style={{
             ...tabStyle,
-            borderBottom: activeTab === "private" ? "3px solid #007bff" : "3px solid transparent",
-            color: activeTab === "private" ? "#4dabf5" : "#aaaaaa"
+            borderBottom: activeTab === "private" ? "3px solid var(--primary)" : "3px solid transparent",
+            color: activeTab === "private" ? "var(--primary)" : "var(--muted-foreground)"
           }}
         >
-          Private {hasPrivateUnread && <span className="tab-indicator" style={{width: '8px', height: '8px', backgroundColor: 'blue', borderRadius: '50%', display: 'inline-block', marginLeft: '5px'}}></span>}
+          Private {hasPrivateUnread && <span className="tab-indicator" style={tabIndicatorStyle}></span>}
         </button>
         <button 
           onClick={() => setActiveTab("group")}
           style={{
             ...tabStyle,
-            borderBottom: activeTab === "group" ? "3px solid #007bff" : "3px solid transparent",
-            color: activeTab === "group" ? "#4dabf5" : "#aaaaaa"
+            borderBottom: activeTab === "group" ? "3px solid var(--primary)" : "3px solid transparent",
+            color: activeTab === "group" ? "var(--primary)" : "var(--muted-foreground)"
           }}
         >
-          Groups {hasGroupUnread && <span className="tab-indicator" style={{width: '8px', height: '8px', backgroundColor: 'blue', borderRadius: '50%', display: 'inline-block', marginLeft: '5px'}}></span>}
+          Groups {hasGroupUnread && <span className="tab-indicator" style={tabIndicatorStyle}></span>}
         </button>
       </div>
 
@@ -128,8 +128,31 @@ export default function SidebarManager({ onSelectTarget, selectedTargetId }) {
   );
 }
 
+async function getPrivateContacts() {
+  try {
+    return await getChatContacts();
+  } catch (err) {
+    if (err?.status !== 404) {
+      throw err;
+    }
+    const [followers = [], following = []] = await Promise.all([getFollowers(), getFollowing()]);
+    return mergeChatUsers(followers, following);
+  }
+}
+
+function mergeChatUsers(followers, following) {
+  const usersById = new Map();
+
+  [...followers, ...following].forEach((user) => {
+    if (!user?.id || usersById.has(user.id)) return;
+    usersById.set(user.id, { ...user, can_message: true });
+  });
+
+  return Array.from(usersById.values());
+}
+
 function UserList({ users, onSelect, selectedId, unreadChatIds }) {
-  if (users.length === 0) return <p style={infoStyle}>No mutual followers yet.</p>;
+  if (users.length === 0) return <p style={infoStyle}>No conversations yet.</p>;
 
   return (
     <ul style={listStyle}>
@@ -141,7 +164,7 @@ function UserList({ users, onSelect, selectedId, unreadChatIds }) {
             onClick={() => onSelect({ ...user, type: "private" })}
             style={{
               ...itemStyle,
-              background: selectedId === user.id ? "#2c3e50" : "transparent"
+              background: selectedId === user.id ? "var(--bg-selected)" : "transparent"
             }}
           >
             <div style={avatarStyle}>
@@ -149,9 +172,12 @@ function UserList({ users, onSelect, selectedId, unreadChatIds }) {
             </div>
             <div style={{ flex: 1 }}>
               <div style={nameStyle}>{user.first_name} {user.last_name}</div>
-              <div style={subStyle}>@{user.nickname || "user"}</div>
+              <div style={subStyle}>
+                @{user.nickname || "user"}
+                {user.can_message === false ? " · read only" : ""}
+              </div>
             </div>
-            {isUnread && <span style={{color: 'red', fontSize: '12px', fontWeight: 'bold'}}>New</span>}
+            {isUnread && <span style={newBadgeStyle}>New</span>}
           </li>
         );
       })}
@@ -172,15 +198,15 @@ function GroupList({ groups, onSelect, selectedId, unreadChatIds }) {
             onClick={() => onSelect({ ...group, type: "group" })}
             style={{
               ...itemStyle,
-              background: selectedId === group.id ? "#2c3e50" : "transparent"
+              background: selectedId === group.id ? "var(--bg-selected)" : "transparent"
             }}
           >
-            <div style={{ ...avatarStyle, borderRadius: "8px", background: "#333" }}>G</div>
+            <div style={{ ...avatarStyle, borderRadius: "8px" }}>G</div>
             <div style={{ flex: 1 }}>
               <div style={nameStyle}>{group.title}</div>
               <div style={subStyle}>{group.description?.substring(0, 30)}...</div>
             </div>
-            {isUnread && <span style={{color: 'red', fontSize: '12px', fontWeight: 'bold'}}>New</span>}
+            {isUnread && <span style={newBadgeStyle}>New</span>}
           </li>
         );
       })}
@@ -192,13 +218,13 @@ const sidebarContainerStyle = {
   display: "flex",
   flexDirection: "column",
   height: "100%",
-  background: "#121212",
-  borderRight: "1px solid #333",
+  background: "var(--background)",
+  borderRight: "1px solid var(--border)",
 };
 
 const tabContainerStyle = {
   display: "flex",
-  borderBottom: "1px solid #333",
+  borderBottom: "1px solid var(--border)",
 };
 
 const tabStyle = {
@@ -227,14 +253,16 @@ const itemStyle = {
   alignItems: "center",
   padding: "0.75rem 1rem",
   cursor: "pointer",
-  borderBottom: "1px solid #333",
+  borderBottom: "1px solid var(--border)",
+  color: "var(--foreground)",
 };
 
 const avatarStyle = {
   width: "40px",
   height: "40px",
   borderRadius: "50%",
-  background: "#333",
+  background: "var(--border)",
+  color: "var(--foreground)",
   marginRight: "0.75rem",
   display: "flex",
   alignItems: "center",
@@ -245,6 +273,15 @@ const avatarStyle = {
 
 const imgStyle = { width: "100%", height: "100%", objectFit: "cover" };
 
-const nameStyle = { fontWeight: "600", fontSize: "0.95rem", color: "white" };
-const subStyle = { fontSize: "0.8rem", color: "#aaaaaa" };
-const infoStyle = { padding: "1rem", color: "#aaaaaa", textAlign: "center" };
+const nameStyle = { fontWeight: "600", fontSize: "0.95rem", color: "var(--foreground)" };
+const subStyle = { fontSize: "0.8rem", color: "var(--muted-foreground)" };
+const infoStyle = { padding: "1rem", color: "var(--muted-foreground)", textAlign: "center" };
+const newBadgeStyle = { color: "var(--error)", fontSize: "12px", fontWeight: "bold" };
+const tabIndicatorStyle = {
+  width: "8px",
+  height: "8px",
+  backgroundColor: "var(--primary)",
+  borderRadius: "50%",
+  display: "inline-block",
+  marginLeft: "5px",
+};

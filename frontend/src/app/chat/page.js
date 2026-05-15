@@ -59,7 +59,7 @@ export default function ChatPage() {
           <div style={emptyStateStyle}>
             <span style={{ fontSize: "3rem", marginBottom: "1rem" }}>💬</span>
             <h2>Select a conversation to start chatting</h2>
-            <p style={{ color: "#888" }}>Pick a friend or group from the list on the left.</p>
+            <p style={{ color: "var(--muted-foreground)" }}>Pick a friend or group from the list on the left.</p>
           </div>
         )}
       </main>
@@ -70,8 +70,8 @@ export default function ChatPage() {
 const pageContainerStyle = {
   display: "flex",
   height: "calc(100vh - 64px)",
-  background: "#121212",
-  color: "white",
+  background: "var(--background)",
+  color: "var(--foreground)",
   overflow: "hidden",
 };
 
@@ -84,7 +84,7 @@ const mainContentStyle = {
   flex: 1,
   display: "flex",
   flexDirection: "column",
-  background: "#1e1e1e",
+  background: "var(--surface)",
 };
 
 const emptyStateStyle = {

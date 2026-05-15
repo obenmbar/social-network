@@ -36,7 +36,7 @@ func (r *Repository) GetUserNotifications(userID string) ([]Notification, error)
 	query := `
 		SELECT id, user_id, type, content, source_id, is_read, created_at
 		FROM notifications
-		WHERE user_id = ?
+		WHERE user_id = ? AND is_read = FALSE
 		ORDER BY created_at DESC`
 
 	rows, err := r.db.Query(query, userID)

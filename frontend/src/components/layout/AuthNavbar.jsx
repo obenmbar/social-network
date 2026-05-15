@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { logout } from "@/lib/api";
 import { removeSession } from "@/lib/session";
 import NavIcons from "./NavIcons";
@@ -11,7 +11,22 @@ import styles from "./AuthNavbar.module.css";
 export default function AuthNavbar({ user, theme, setTheme }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
   const avatarInitial = user?.first_name?.trim()?.charAt(0)?.toUpperCase() || "?";
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const handlePointerDown = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isMenuOpen]);
 
   const handleLogout = async () => {
     setIsLoading(true);
@@ -62,8 +77,14 @@ export default function AuthNavbar({ user, theme, setTheme }) {
 
         <NavIcons />
 
-        <div className={styles.avatarMenu}>
-          <button type="button" className={styles.avatarButton} aria-label="Account menu">
+        <div className={styles.avatarMenu} ref={menuRef}>
+          <button
+            type="button"
+            className={styles.avatarButton}
+            aria-label="Account menu"
+            aria-expanded={isMenuOpen}
+            onClick={() => setIsMenuOpen((current) => !current)}
+          >
             {user?.avatar ? (
               <span
                 className={styles.avatarImage}
@@ -74,8 +95,8 @@ export default function AuthNavbar({ user, theme, setTheme }) {
             )}
           </button>
 
-          <div className={styles.menuList}>
-            <Link href="/profile" className={styles.menuItem}>
+          <div className={`${styles.menuList} ${isMenuOpen ? styles.menuListOpen : ""}`}>
+            <Link href="/profile" className={styles.menuItem} onClick={() => setIsMenuOpen(false)}>
               Profile
             </Link>
             <button
