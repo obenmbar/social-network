@@ -100,6 +100,15 @@ func (s *Service) CreateGroup(userID string, req CreateGroupRequest) (*Group, er
 	if err := s.repo.CreateGroup(group, inviteeIDs); err != nil {
 		return nil, err
 	}
+	for _, inviteeID := range inviteeIDs {
+		if inviteeID == userID {
+			continue
+		}
+		content := "You are invited to join group: " + group.Title
+		if err := s.notifyUser(inviteeID, "group_invite", content, &group.ID); err != nil {
+			return nil, err
+		}
+	}
 	return s.repo.GetGroupByID(userID, group.ID)
 }
 
@@ -187,18 +196,7 @@ func (s *Service) InviteUser(userID, groupID string, req InviteRequest) error {
 	group, _ := s.repo.GetGroupByID(userID, groupID)
 	if group != nil {
 		content := "You are invited to join group: " + group.Title
-		s.notifRepo.CreateNotification(&notification.Notification{
-			UserID:  inviteeID,
-			Type:    "group_invite",
-			Content: content,
-		})
-
-		// Real-time broadcast
-		s.hub.Broadcast <- &chat.Message{
-			Type:       "notification",
-			ReceiverID: &inviteeID,
-			Content:    content,
-		}
+		return s.notifyUser(inviteeID, "group_invite", content, &group.ID)
 	}
 	return nil
 }
@@ -236,18 +234,7 @@ func (s *Service) RequestToJoin(userID, groupID string) error {
 	// Trigger Notification to Creator
 	if group != nil {
 		content := "A user has requested to join your group: " + group.Title
-		s.notifRepo.CreateNotification(&notification.Notification{
-			UserID:  group.CreatorID,
-			Type:    "group_request",
-			Content: content,
-		})
-
-		// Real-time broadcast
-		s.hub.Broadcast <- &chat.Message{
-			Type:       "notification",
-			ReceiverID: &group.CreatorID,
-			Content:    content,
-		}
+		return s.notifyUser(group.CreatorID, "group_request", content, &group.ID)
 	}
 	return nil
 }
@@ -276,18 +263,7 @@ func (s *Service) RespondToJoinRequest(userID, groupID, requesterID, status stri
 	group, _ := s.repo.GetGroupByID(userID, groupID)
 	if group != nil {
 		content := "Your request to join group '" + group.Title + "' was " + status
-		s.notifRepo.CreateNotification(&notification.Notification{
-			UserID:  requesterID,
-			Type:    "group_request_response",
-			Content: content,
-		})
-
-		// Real-time broadcast
-		s.hub.Broadcast <- &chat.Message{
-			Type:       "notification",
-			ReceiverID: &requesterID,
-			Content:    content,
-		}
+		return s.notifyUser(requesterID, "group_request_response", content, &group.ID)
 	}
 	return nil
 }
@@ -431,20 +407,9 @@ func (s *Service) FollowUser(followerID, followedID string) error {
 		return err
 	}
 
-	// Trigger Notification
 	content := "A user has requested to follow you"
-	s.notifRepo.CreateNotification(&notification.Notification{
-		UserID:   followedID,
-		SourceID: &followerID,
-		Type:     "follow_request",
-		Content:  content,
-	})
-
-	// Real-time broadcast
-	s.hub.Broadcast <- &chat.Message{
-		Type:       "notification",
-		ReceiverID: &followedID,
-		Content:    content,
+	if err := s.notifyUser(followedID, "follow_request", content, &followerID); err != nil {
+		return err
 	}
 
 	return nil
@@ -458,20 +423,43 @@ func (s *Service) AcceptFollowRequest(followerID, followedID string) error {
 		return err
 	}
 
-	// Trigger Notification to the new follower
 	content := "Your follow request was accepted"
-	s.notifRepo.CreateNotification(&notification.Notification{
-		UserID:   followerID,
-		SourceID: &followedID,
-		Type:     "follow_accept",
-		Content:  content,
-	})
+	if err := s.notifyUser(followerID, "follow_accept", content, &followedID); err != nil {
+		return err
+	}
 
-	// Real-time broadcast
-	s.hub.Broadcast <- &chat.Message{
-		Type:       "notification",
-		ReceiverID: &followerID,
-		Content:    content,
+	return nil
+}
+
+func (s *Service) notifyUser(userID, notifType, content string, sourceID *string) error {
+	if s.notifRepo == nil {
+		return nil
+	}
+
+	n := &notification.Notification{
+		UserID:   userID,
+		SourceID: sourceID,
+		Type:     notifType,
+		Content:  content,
+	}
+	if err := s.notifRepo.CreateNotification(n); err != nil {
+		return err
+	}
+
+	if s.hub != nil {
+		msg := &chat.Message{
+			ID:         n.ID,
+			Type:       n.Type,
+			SourceID:   n.SourceID,
+			ReceiverID: &userID,
+			Content:    n.Content,
+			IsRead:     n.IsRead,
+			CreatedAt:  n.CreatedAt,
+		}
+		select {
+		case s.hub.Broadcast <- msg:
+		default:
+		}
 	}
 
 	return nil

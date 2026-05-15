@@ -43,11 +43,7 @@ export const WebSocketProvider = ({ children }) => {
 
   // Social notifications filtering (only for convenience, count is state-based)
   const socialNotifications = useMemo(() => {
-    return realtimeNotifications.filter(n => 
-      n.type === "follow_request" || 
-      n.type === "group_invite" || 
-      n.type === "group_request"
-    );
+    return realtimeNotifications.filter(isSocialNotificationType);
   }, [realtimeNotifications]);
 
   const removeSocialNotification = useCallback((id) => {
@@ -109,16 +105,14 @@ export const WebSocketProvider = ({ children }) => {
         const currentMe = meRef.current;
         const currentActiveChat = activeChatRef.current;
 
-        // RELIABLE NOTIFICATION DETECTION
-        // If it's explicitly a notification signal
         if (incoming.type === "notification") {
           setHasUnreadNotifications(true);
           window.dispatchEvent(new Event('new_social_notification'));
           return;
         }
 
-        // LEGACY/FALLBACK NOTIFICATION DETECTION
-        const isNotification = incoming.notification_id || 
+        const isNotification = isSocialNotificationType(incoming) ||
+                               incoming.notification_id || 
                                !incoming.content || 
                                (!incoming.sender_id && !incoming.receiver_id && !incoming.group_id);
 
@@ -233,6 +227,16 @@ export const WebSocketProvider = ({ children }) => {
     </WebSocketContext.Provider>
   );
 };
+
+function isSocialNotificationType(item) {
+  return (
+    item?.type === "follow_request" ||
+    item?.type === "follow_accept" ||
+    item?.type === "group_invite" ||
+    item?.type === "group_request" ||
+    item?.type === "group_request_response"
+  );
+}
 
 function buildWebSocketURL(configuredURL) {
   const fallback = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8080/ws`;
