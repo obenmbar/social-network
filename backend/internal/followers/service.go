@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 
+	"social-network/internal/notification"
+
 	"github.com/gofrs/uuid/v5"
 )
 
@@ -17,11 +19,16 @@ var (
 )
 
 type Service struct {
-	repo *Repository
+	repo      *Repository
+	notifRepo *notification.Repository
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repository, notifRepos ...*notification.Repository) *Service {
+	var notifRepo *notification.Repository
+	if len(notifRepos) > 0 {
+		notifRepo = notifRepos[0]
+	}
+	return &Service{repo: repo, notifRepo: notifRepo}
 }
 
 func (s *Service) ListUsers(viewerID string) ([]UserSummary, error) {
@@ -74,9 +81,16 @@ func (s *Service) Follow(requesterID, targetID string) (FollowResponse, error) {
 	}
 
 	id, _ := uuid.NewV4()
-	if err := s.repo.CreateFollowRequest(id.String(), requesterID, targetID); err != nil {
+	requestID := id.String()
+	if err := s.repo.CreateFollowRequest(requestID, requesterID, targetID); err != nil {
 		return FollowResponse{}, err
 	}
+	s.notify(&notification.Notification{
+		UserID:   targetID,
+		SourceID: &requestID,
+		Type:     "follow_request",
+		Content:  "A user has requested to follow you",
+	})
 	return FollowResponse{Status: StatusPending}, nil
 }
 
@@ -108,6 +122,12 @@ func (s *Service) RespondToRequest(userID, requestID, status string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *Service) notify(n *notification.Notification) {
+	if s.notifRepo != nil {
+		_ = s.notifRepo.CreateNotification(n)
+	}
 }
 
 func (s *Service) ListFollowers(viewerID, userID string) ([]UserSummary, error) {

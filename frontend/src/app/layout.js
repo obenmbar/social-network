@@ -1,5 +1,6 @@
 import "./globals.css";
 import AppShell from "@/components/layout/AppShell";
+import { WebSocketProvider } from "@/context/WebSocketContext";
 
 export const metadata = {
   title: "Social Network",
@@ -11,7 +12,9 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body suppressHydrationWarning>
         <main className="container">
-          <AppShell>{children}</AppShell>
+          <WebSocketProvider>
+            <AppShell>{children}</AppShell>
+          </WebSocketProvider>
         </main>
       </body>
     </html>

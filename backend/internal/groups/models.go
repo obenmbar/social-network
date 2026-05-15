@@ -16,24 +16,26 @@ const (
 )
 
 type Author struct {
-	ID        string  `json:"id"`
-	FirstName string  `json:"first_name"`
-	LastName  string  `json:"last_name"`
-	Nickname  *string `json:"nickname,omitempty"`
-	Avatar    *string `json:"avatar,omitempty"`
+	ID           string     `json:"id"`
+	FirstName    string     `json:"first_name"`
+	LastName     string     `json:"last_name"`
+	Nickname     *string    `json:"nickname,omitempty"`
+	Avatar       *string    `json:"avatar,omitempty"`
+	LastActivity *time.Time `json:"last_activity,omitempty"`
 }
 
 type Group struct {
-	ID          string    `json:"id"`
-	CreatorID   string    `json:"creator_id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	Creator     Author    `json:"creator"`
-	MemberCount int       `json:"member_count"`
-	IsMember    bool      `json:"is_member"`
-	HasRequest  bool      `json:"has_request"`
-	HasInvite   bool      `json:"has_invite"`
+	ID           string     `json:"id"`
+	CreatorID    string     `json:"creator_id"`
+	Title        string     `json:"title"`
+	Description  string     `json:"description"`
+	CreatedAt    time.Time  `json:"created_at"`
+	Creator      Author     `json:"creator"`
+	MemberCount  int        `json:"member_count"`
+	IsMember     bool       `json:"is_member"`
+	HasRequest   bool       `json:"has_request"`
+	HasInvite    bool       `json:"has_invite"`
+	LastActivity *time.Time `json:"last_activity,omitempty"`
 }
 
 type GroupPost struct {

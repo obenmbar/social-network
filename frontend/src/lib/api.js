@@ -41,8 +41,12 @@ async function fetchAPI(endpoint, method = "GET", body = null) {
 async function getErrorMessage(res) {
   const contentType = res.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
-    const data = await res.json();
-    return data.error || data.message;
+    try {
+      const data = await res.json();
+      return data.error || data.message;
+    } catch (e) {
+      return null;
+    }
   }
 
   return res.text();
@@ -96,6 +100,14 @@ export async function respondToFollowRequest(requestId, status) {
 
 export async function updateProfileVisibility(isPublic) {
   return fetchAPI("/me/profile-visibility", "PATCH", { is_public: isPublic });
+}
+
+export async function acceptFollowRequest(requestId) {
+  return respondToFollowRequest(requestId, "accepted");
+}
+
+export async function declineFollowRequest(requestId) {
+  return respondToFollowRequest(requestId, "declined");
 }
 
 export async function logout() {
@@ -204,6 +216,30 @@ export async function respondToGroupEvent(groupId, eventId, response) {
   return fetchAPI(`/groups/${groupId}/events/${eventId}/responses`, "POST", {
     response,
   });
+}
+
+export async function getNotifications() {
+  return fetchAPI("/notifications");
+}
+
+export async function getChatHistory(userId, cursor = "") {
+  const params = new URLSearchParams({ user_id: userId });
+  if (cursor) {
+    params.set("cursor", cursor);
+  }
+  return fetchAPI(`/chat/history?${params.toString()}`);
+}
+
+export async function getGroupChatHistory(groupId, cursor = "") {
+  const params = new URLSearchParams({ group_id: groupId });
+  if (cursor) {
+    params.set("cursor", cursor);
+  }
+  return fetchAPI(`/chat/group/history?${params.toString()}`);
+}
+
+export async function markNotificationRead(notificationId) {
+  return fetchAPI("/notifications/read", "POST", { id: notificationId });
 }
 
 export function mediaUrl(path) {

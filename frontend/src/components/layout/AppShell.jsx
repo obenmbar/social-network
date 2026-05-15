@@ -12,9 +12,14 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [theme, setTheme] = useState('dark');
 
   const isAuthRoute = authRoutes.has(pathname);
   const hasLocalSession = hasSession();
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     let isMounted = true;
@@ -116,14 +121,17 @@ export default function AppShell({ children }) {
     return children;
   }
 
-  if (!hasLocalSession || !user) {
-    return null;
+  // If session exists locally, render content immediately to avoid 'freeze' 
+  // until getCurrentUser resolves.
+  if (hasLocalSession) {
+    return (
+      <>
+        {user && <AuthNavbar user={user} theme={theme} setTheme={setTheme} />}
+        {children}
+      </>
+    );
   }
 
-  return (
-    <>
-      <AuthNavbar user={user} />
-      {children}
-    </>
-  );
+  // If no session, wait for useEffect to redirect
+  return null;
 }

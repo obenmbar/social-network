@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"social-network/internal/chat"
+	"social-network/internal/notification"
+
 	"github.com/gofrs/uuid/v5"
 )
 
@@ -35,11 +38,13 @@ const (
 )
 
 type Service struct {
-	repo *Repository
+	repo      *Repository
+	notifRepo *notification.Repository
+	hub       *chat.Hub
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repository, notifRepo *notification.Repository, hub *chat.Hub) *Service {
+	return &Service{repo: repo, notifRepo: notifRepo, hub: hub}
 }
 
 func (s *Service) CreateGroup(userID string, req CreateGroupRequest) (*Group, error) {
@@ -135,7 +140,28 @@ func (s *Service) InviteUser(userID, groupID string, req InviteRequest) error {
 	if err := s.requireFollower(userID, inviteeID); err != nil {
 		return err
 	}
-	return s.repo.InviteUser(groupID, userID, inviteeID)
+	if err := s.repo.InviteUser(groupID, userID, inviteeID); err != nil {
+		return err
+	}
+
+	// Trigger Notification
+	group, _ := s.repo.GetGroupByID(userID, groupID)
+	if group != nil {
+		content := "You are invited to join group: " + group.Title
+		s.notifRepo.CreateNotification(&notification.Notification{
+			UserID:  inviteeID,
+			Type:    "group_invite",
+			Content: content,
+		})
+
+		// Real-time broadcast
+		s.hub.Broadcast <- &chat.Message{
+			Type:       "notification",
+			ReceiverID: &inviteeID,
+			Content:    content,
+		}
+	}
+	return nil
 }
 
 func (s *Service) RespondToInvitation(userID, groupID, status string) error {
@@ -164,7 +190,27 @@ func (s *Service) RequestToJoin(userID, groupID string) error {
 	if group.IsMember {
 		return nil
 	}
-	return s.repo.RequestToJoin(groupID, userID)
+	if err := s.repo.RequestToJoin(groupID, userID); err != nil {
+		return err
+	}
+
+	// Trigger Notification to Creator
+	if group != nil {
+		content := "A user has requested to join your group: " + group.Title
+		s.notifRepo.CreateNotification(&notification.Notification{
+			UserID:  group.CreatorID,
+			Type:    "group_request",
+			Content: content,
+		})
+
+		// Real-time broadcast
+		s.hub.Broadcast <- &chat.Message{
+			Type:       "notification",
+			ReceiverID: &group.CreatorID,
+			Content:    content,
+		}
+	}
+	return nil
 }
 
 func (s *Service) RespondToJoinRequest(userID, groupID, requesterID, status string) error {
@@ -185,6 +231,24 @@ func (s *Service) RespondToJoinRequest(userID, groupID, requesterID, status stri
 			return ErrGroupNotFound
 		}
 		return err
+	}
+
+	// Trigger Notification to Requester
+	group, _ := s.repo.GetGroupByID(userID, groupID)
+	if group != nil {
+		content := "Your request to join group '" + group.Title + "' was " + status
+		s.notifRepo.CreateNotification(&notification.Notification{
+			UserID:  requesterID,
+			Type:    "group_request_response",
+			Content: content,
+		})
+
+		// Real-time broadcast
+		s.hub.Broadcast <- &chat.Message{
+			Type:       "notification",
+			ReceiverID: &requesterID,
+			Content:    content,
+		}
 	}
 	return nil
 }
@@ -305,6 +369,64 @@ func (s *Service) RespondToEvent(userID, groupID, eventID string, req EventRespo
 
 func (s *Service) GetInvitations(userID string) ([]*Invitation, error) {
 	return s.repo.GetInvitations(userID)
+}
+
+func (s *Service) FollowUser(followerID, followedID string) error {
+	if followerID == followedID {
+		return errors.New("cannot follow yourself")
+	}
+	if err := s.repo.CreateFollowRequest(followerID, followedID); err != nil {
+		return err
+	}
+
+	// Trigger Notification
+	content := "A user has requested to follow you"
+	s.notifRepo.CreateNotification(&notification.Notification{
+		UserID:   followedID,
+		SourceID: &followerID,
+		Type:     "follow_request",
+		Content:  content,
+	})
+
+	// Real-time broadcast
+	s.hub.Broadcast <- &chat.Message{
+		Type:       "notification",
+		ReceiverID: &followedID,
+		Content:    content,
+	}
+
+	return nil
+}
+
+func (s *Service) AcceptFollowRequest(followerID, followedID string) error {
+	if err := s.repo.CreateFollower(followerID, followedID); err != nil {
+		return err
+	}
+	if err := s.repo.DeleteFollowRequest(followerID, followedID); err != nil {
+		return err
+	}
+
+	// Trigger Notification to the new follower
+	content := "Your follow request was accepted"
+	s.notifRepo.CreateNotification(&notification.Notification{
+		UserID:   followerID,
+		SourceID: &followedID,
+		Type:     "follow_accept",
+		Content:  content,
+	})
+
+	// Real-time broadcast
+	s.hub.Broadcast <- &chat.Message{
+		Type:       "notification",
+		ReceiverID: &followerID,
+		Content:    content,
+	}
+
+	return nil
+}
+
+func (s *Service) DeclineFollowRequest(followerID, followedID string) error {
+	return s.repo.DeleteFollowRequest(followerID, followedID)
 }
 
 func (s *Service) GetFollowers(userID string) ([]Author, error) {

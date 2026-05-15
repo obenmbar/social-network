@@ -20,6 +20,7 @@ find_free_port() {
 BACKEND_PORT="${PORT:-8080}"
 BACKEND_PORT="$(find_free_port "$BACKEND_PORT")"
 BACKEND_URL="http://127.0.0.1:${BACKEND_PORT}"
+WS_URL="ws://127.0.0.1:${BACKEND_PORT}/ws"
 
 # Start backend in the background
 echo "-> Starting Backend (Go)..."
@@ -41,7 +42,7 @@ if [ ! -d node_modules ]; then
   echo "-> Installing frontend dependencies..."
   npm install
 fi
-BACKEND_URL="$BACKEND_URL" npm run dev -- -H 127.0.0.1 &
+BACKEND_URL="$BACKEND_URL" NEXT_PUBLIC_WS_URL="$WS_URL" npm run dev -- -H 127.0.0.1 &
 FRONTEND_PID=$!
 cd "$ROOT_DIR"
 

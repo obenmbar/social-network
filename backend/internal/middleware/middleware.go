@@ -14,9 +14,7 @@ import (
 	"social-network/internal/auth"
 )
 
-type contextKey string
-
-const UserIDKey contextKey = "userID"
+const UserIDKey = "userID"
 
 const maxRequestHeaderBytes = 16 << 10
 
@@ -39,12 +37,8 @@ func SessionMiddleware(authService *auth.Service) func(http.Handler) http.Handle
 
 			session, err := authService.ValidateSession(cookie.Value)
 			if err != nil {
-				if err.Error() == "session expired or invalid" {
-					writeUnauthorized(w, r, "Session expired")
-				} else {
-					log.Printf("failed to validate session: remote=%s path=%s err=%v", r.RemoteAddr, r.URL.Path, err)
-					writeUnauthorized(w, r, "Unauthorized")
-				}
+				log.Printf("failed to validate session: remote=%s path=%s err=%v", r.RemoteAddr, r.URL.Path, err)
+				writeUnauthorized(w, r, "Invalid or expired session")
 				return
 			}
 

@@ -39,8 +39,8 @@ export default function LoginForm() {
       saveSession();
       setNotification({ message: "Login successful! Redirecting...", type: "success" });
       setTimeout(() => {
-        router.replace("/");
-      }, 1000);
+        router.push("/");
+      }, 100);
     } catch (err) {
       setNotification({ message: err.message || "Failed to login. Please check your credentials.", type: "error" });
       setIsLoading(false);

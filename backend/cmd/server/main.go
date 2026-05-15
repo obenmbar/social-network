@@ -11,9 +11,11 @@ import (
 	"time"
 
 	"social-network/internal/auth"
+	"social-network/internal/chat"
 	"social-network/internal/followers"
 	"social-network/internal/groups"
 	"social-network/internal/middleware"
+	"social-network/internal/notification"
 	"social-network/internal/posts"
 	"social-network/pkg/db/sqlite"
 )
@@ -42,7 +44,17 @@ func main() {
 	}
 	log.Println("Migrations completed successfully.")
 
-	// 3. Manual Dependency Injection
+	// Notification initialization
+	notifRepo := notification.NewRepository(db)
+	notifHandler := notification.NewHandler(notifRepo)
+
+	// Chat initialization
+	chatRepo := chat.NewRepository(db)
+	chatHub := chat.NewHub(chatRepo)
+	go chatHub.Run()
+	chatWSHandler := chat.NewHandler(chatHub, chatRepo)
+
+	// Manual Dependency Injection
 	authRepo := auth.NewRepository(db)
 	authService := auth.NewService(authRepo)
 	authHandler := auth.NewHandler(authService)
@@ -50,13 +62,14 @@ func main() {
 	postsService := posts.NewService(postsRepo, filepath.Join(projectRoot, "uploads"))
 	postsHandler := posts.NewHandler(postsService)
 	groupsRepo := groups.NewRepository(db)
-	groupsService := groups.NewService(groupsRepo)
+	groupsService := groups.NewService(groupsRepo, notifRepo, chatHub)
 	groupsHandler := groups.NewHandler(groupsService)
 	followersRepo := followers.NewRepository(db)
-	followersService := followers.NewService(followersRepo)
+	followersService := followers.NewService(followersRepo, notifRepo)
 	followersHandler := followers.NewHandler(followersService)
 
 	// Middlewares
+
 	rateLimitRequests := getEnvInt("RATE_LIMIT_REQUESTS", 20)
 	rateLimitWindow := getEnvDuration("RATE_LIMIT_WINDOW", 10*time.Second)
 	rateLimiter := middleware.NewRateLimiter(rateLimitRequests, rateLimitWindow)
@@ -97,10 +110,21 @@ func main() {
 	mux.Handle("/groups/{id}/events", sessionAuth(http.HandlerFunc(groupsHandler.CreateEvent)))
 	mux.Handle("/groups/{id}/events/{eventID}/responses", sessionAuth(http.HandlerFunc(groupsHandler.RespondToEvent)))
 
+	// Chat routes
+	mux.Handle("GET /ws", sessionAuth(http.HandlerFunc(chatWSHandler.ServeWS)))
+	mux.Handle("GET /chat/history", sessionAuth(http.HandlerFunc(chatWSHandler.GetHistory)))
+	mux.Handle("GET /chat/group/history", sessionAuth(http.HandlerFunc(chatWSHandler.GetGroupHistory)))
+
+	// Notification routes
+	// Teammates: Pass notifRepo to your Follower/Group handlers to trigger notifications using notifRepo.CreateNotification().
+	mux.Handle("GET /notifications", sessionAuth(http.HandlerFunc(notifHandler.GetNotifications)))
+	mux.Handle("POST /notifications/read", sessionAuth(http.HandlerFunc(notifHandler.MarkRead)))
+
 	// Uploaded media
 	mux.Handle("/uploads/", sessionAuth(http.HandlerFunc(postsHandler.ServeUpload)))
 
 	handler := middleware.RequestHeaderSizeMiddleware(16 << 10)(rateLimiter.Middleware()(mux))
+	handler = CORSMiddleware(handler)
 
 	// 5. Start Server
 	addr := ":" + port
@@ -114,6 +138,25 @@ func main() {
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
+}
+
+func CORSMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin == "http://localhost:3000" || origin == "http://127.0.0.1:3000" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		}
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, X-Requested-With")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func getEnv(key, fallback string) string {
