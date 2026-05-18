@@ -37,13 +37,17 @@ export default function RegisterForm() {
     }));
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      const avatarError = validateAvatarFile(file);
+      const avatarError = await validateAvatarFile(file);
       if (avatarError) {
         setNotification({ message: avatarError, type: "error" });
         if (fileInputRef.current) fileInputRef.current.value = "";
+        setFormData((prev) => ({
+          ...prev,
+          avatar: "",
+        }));
         return;
       }
 
