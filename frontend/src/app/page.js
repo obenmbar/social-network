@@ -26,6 +26,7 @@ import {
   MaxPostContentLen,
   MaxPostTitleLen,
 } from "@/lib/limits";
+import Notification from "@/components/ui/Notification";
 import styles from "./Feed.module.css";
 
 const privacyOptions = [
@@ -59,7 +60,6 @@ export default function Feed() {
   const [expandedPosts, setExpandedPosts] = useState({});
   const [commentDrafts, setCommentDrafts] = useState({});
   const [commentImages, setCommentImages] = useState({});
-  const [commentErrors, setCommentErrors] = useState({});
   const [postingComments, setPostingComments] = useState({});
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -155,7 +155,7 @@ export default function Feed() {
 
   const handleCreatePost = async (event) => {
     event.preventDefault();
-    const form = event.currentTarget;
+    const form = getSubmitForm(event);
     setError("");
     setIsPosting(true);
 
@@ -175,7 +175,7 @@ export default function Feed() {
       setMentionInput("@");
       setSelectedFollowerIds([]);
       setImage(null);
-      form.reset();
+      form?.reset();
     } catch (err) {
       setError(err.message || "Could not create post");
     } finally {
@@ -222,29 +222,14 @@ export default function Feed() {
     }
   };
 
-  const clearCommentError = (postId) => {
-    setCommentErrors((current) => {
-      if (!current[postId]) {
-        return current;
-      }
-
-      const next = { ...current };
-      delete next[postId];
-      return next;
-    });
-  };
-
   const handleCommentImageChange = (event, postId) => {
     const file = event.target.files?.[0] || null;
-    clearCommentError(postId);
+    setError("");
 
     if (file && file.size > MaxImageSizeBytes) {
       event.target.value = "";
       setCommentImages((current) => ({ ...current, [postId]: null }));
-      setCommentErrors((current) => ({
-        ...current,
-        [postId]: `Images must be ${MaxImageSizeMB} MB or smaller`,
-      }));
+      setError(`Images must be ${MaxImageSizeMB} MB or smaller`);
       return;
     }
 
@@ -273,13 +258,9 @@ export default function Feed() {
       }));
       setCommentDrafts((current) => ({ ...current, [postId]: "" }));
       setCommentImages((current) => ({ ...current, [postId]: null }));
-      clearCommentError(postId);
-      form.reset();
+      form?.reset();
     } catch (err) {
-      setCommentErrors((current) => ({
-        ...current,
-        [postId]: err.message || "Could not add comment",
-      }));
+      setError(err.message || "Could not add comment");
     } finally {
       activeCommentSubmissions.current.delete(postId);
       setPostingComments((current) => ({ ...current, [postId]: false }));
@@ -288,9 +269,8 @@ export default function Feed() {
 
   const handleCreateComment = (event, postId) => {
     event.preventDefault();
-    const form = event.currentTarget;
+    const form = getSubmitForm(event);
     setError("");
-    clearCommentError(postId);
 
     if (activeCommentSubmissions.current.has(postId)) {
       return;
@@ -371,6 +351,7 @@ export default function Feed() {
 
   return (
     <div className={styles.feedContainer}>
+      <Notification message={error} type="error" onClose={() => setError("")} />
       <div className={styles.feedLayout}>
         <main className={styles.mainContent}>
           <section className={styles.welcomeSection}>
@@ -490,7 +471,6 @@ export default function Feed() {
           </div>
 
           {image && <p className={styles.fileName}>{image.name}</p>}
-          {error && <p className={styles.errorMessage}>{error}</p>}
         </form>
 
         <section className={styles.postsSection}>
@@ -575,11 +555,6 @@ export default function Feed() {
                       {commentImages[post.id] && (
                         <p className={styles.commentFileName}>
                           {commentImages[post.id].name}
-                        </p>
-                      )}
-                      {commentErrors[post.id] && (
-                        <p className={styles.commentErrorMessage} aria-live="polite">
-                          {commentErrors[post.id]}
                         </p>
                       )}
                     </form>
@@ -803,6 +778,11 @@ function PostPlaceholder() {
       </div>
     </div>
   );
+}
+
+function getSubmitForm(event) {
+  const form = event.currentTarget || event.target;
+  return form instanceof HTMLFormElement ? form : null;
 }
 
 function displayName(user) {
