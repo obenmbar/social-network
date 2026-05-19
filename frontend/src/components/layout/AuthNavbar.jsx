@@ -44,7 +44,7 @@ export default function AuthNavbar({ user }) {
   return (
     <header className={styles.navbar}>
       <Link href="/" className={styles.titleLink}>
-        Ophanim
+        BNI DRAR FORUM
       </Link>
 
       <nav className={styles.navActions} aria-label="Main navigation">

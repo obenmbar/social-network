@@ -8,8 +8,10 @@ import { validateAuthFields, validateAvatarFile, validateSafeText, MaxEmailLen, 
 import Notification from "@/components/ui/Notification";
 import styles from "./RegisterForm.module.css";
 
+// Registration form handles new account creation.
 export default function RegisterForm() {
   const router = useRouter();
+  // Keep a ref to the file input element for avatar uploads.
   const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     email: "",
@@ -37,6 +39,7 @@ export default function RegisterForm() {
     }));
   };
 
+  // Validate and preview the selected avatar image.
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -67,6 +70,7 @@ export default function RegisterForm() {
     }
   };
 
+  // Handle registration form submission.
   const handleSubmit = async (e) => {
     e.preventDefault();
     setNotification({ message: "", type: "" });
@@ -116,6 +120,7 @@ export default function RegisterForm() {
     }
   };
 
+  // Render the registration form UI.
   return (
     <div className={styles.formContainer}>
       <Notification

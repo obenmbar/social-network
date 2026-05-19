@@ -39,9 +39,11 @@ const peoplePageSize = 6;
 const commentSubmitDebounceMs = 350;
 
 export default function Feed() {
+  // Router helper for client navigation.
   const router = useRouter();
   const commentSubmitTimers = useRef({});
   const activeCommentSubmissions = useRef(new Set());
+  // Local state for feed data and UI state.
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
   const [followers, setFollowers] = useState([]);
@@ -65,6 +67,7 @@ export default function Feed() {
   const [isLoading, setIsLoading] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
 
+  // Load initial feed and related data when the component mounts.
   useEffect(() => {
     let isMounted = true;
 
@@ -106,10 +109,12 @@ export default function Feed() {
     };
   }, []);
 
+  // Compute the allowed follower IDs for private posts.
   const allowedUserIds = useMemo(() => {
     return privacy === "private_selected" ? selectedFollowerIds : [];
   }, [privacy, selectedFollowerIds]);
 
+  // Filter the people list by the current search query.
   const filteredPeople = useMemo(() => {
     const query = peopleQuery.trim().toLowerCase();
     return users
@@ -153,6 +158,7 @@ export default function Feed() {
       });
   }, [followers, mentionQuery, selectedFollowerIds]);
 
+  // Submit a new post to the backend API.
   const handleCreatePost = async (event) => {
     event.preventDefault();
     const form = getSubmitForm(event);
@@ -199,6 +205,7 @@ export default function Feed() {
     setSelectedFollowerIds((current) => current.filter((id) => id !== followerId));
   };
 
+  // Toggle comment thread visibility for a post.
   const handleToggleComments = async (postId) => {
     if (expandedPosts[postId]) {
       setExpandedPosts((current) => {
