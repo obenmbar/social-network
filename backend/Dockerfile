@@ -1,29 +1,18 @@
-FROM golang:1.26-alpine AS build
-
-WORKDIR /src
-RUN apk add --no-cache gcc musl-dev sqlite-dev
-
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY . .
-RUN CGO_ENABLED=1 GOOS=linux go build -o /out/social-network ./cmd/server
-
-FROM alpine:3.22
+FROM golang:1.26-alpine
 
 WORKDIR /app
-RUN apk add --no-cache ca-certificates sqlite-libs && adduser -D -H appuser
 
-COPY --from=build /out/social-network /app/social-network
-COPY migrations /app/migrations
+RUN apk add --no-cache gcc musl-dev sqlite-dev
 
-RUN mkdir -p /app/data /app/uploads && chown -R appuser:appuser /app
+COPY . .
 
-USER appuser
+RUN go mod download
+RUN CGO_ENABLED=1 go build -o social-network ./cmd/server
 
-ENV PORT=8080 \
-    DB_PATH=/app/data/social_network.db \
-    MIGRATIONS_PATH=/app/migrations/sqlite
+ENV PORT=8080
+ENV DB_PATH=/app/data/social_network.db
+ENV MIGRATIONS_PATH=/app/migrations/sqlite
 
 EXPOSE 8080
-CMD ["/app/social-network"]
+
+CMD ["./social-network"]
